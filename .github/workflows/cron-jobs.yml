@@ -1,0 +1,42 @@
+name: Connector Bot Cron Jobs
+
+# Trigger on every Monday at 19:00 UTC
+on:
+  schedule:
+    # Every Monday at 19:00 UTC (0 19 * * 1)
+    - cron: '0 19 * * 1'
+  # Allow manual trigger for testing
+  workflow_dispatch:
+
+jobs:
+  ask-for-calls:
+    name: Ask for Calls (Last Monday Check)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger /cron/ask endpoint
+        run: |
+          curl -X POST ${{ secrets.RAILWAY_URL }}/cron/ask \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            -H "Content-Type: application/json" \
+            --fail-with-body
+      - name: Check response
+        if: failure()
+        run: echo "Failed to trigger ask_for_calls. Check RAILWAY_URL and CRON_SECRET."
+
+  pair-and-notify:
+    name: Pair & Notify (Last Monday Check)
+    runs-on: ubuntu-latest
+    needs: ask-for-calls
+    steps:
+      - name: Wait 10 minutes before pairing
+        run: sleep 600
+      
+      - name: Trigger /cron/pair endpoint
+        run: |
+          curl -X POST ${{ secrets.RAILWAY_URL }}/cron/pair \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            -H "Content-Type: application/json" \
+            --fail-with-body
+      - name: Check response
+        if: failure()
+        run: echo "Failed to trigger pair_and_notify. Check RAILWAY_URL and CRON_SECRET."

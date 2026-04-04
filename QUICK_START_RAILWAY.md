@@ -26,7 +26,6 @@ CRON_SECRET=<generate-a-secure-random-string>
 CALL_HOUR=19
 CALL_MINUTE=0
 TIMEZONE=Europe/Berlin
-POLLING_DURATION=60
 GROUP_CHAT_ID=<leave-blank-for-now>
 ```
 
@@ -54,41 +53,42 @@ Once green, note your public URL: `https://your-app-name.up.railway.app`
 3. Check Railway logs for `Bot added to group [CHAT_ID]`
 4. Update Railway variables with `GROUP_CHAT_ID = [that ID]`
 
-### 5. Set Up Cron Jobs (Weekly on Monday)
+### 5. Set Up Cron Jobs (GitHub Actions - Already Configured!)
 
-The bot automatically checks if it's the **last Monday of the month** before executing.
-Set these cron jobs to run **weekly on Monday** - they'll only execute on the right day!
+The easiest way is **GitHub Actions** - it's already set up in your repo!
 
-Go to [easycron.com](https://www.easycron.com):
+**What you need to do:**
 
-**Cron 1 - Ask (Every Monday, checks if last Monday of month)**
-```
-URL: https://your-app-name.up.railway.app/cron/ask
-Schedule: 0 19 * * 1
-Method: POST
-Header: Authorization: Bearer <your-CRON_SECRET-from-Railway>
+1. Go to GitHub repository → **Settings** → **Secrets and variables** → **Actions**
+
+2. Click **New repository secret** and add:
+   - Secret name: `RAILWAY_URL`
+   - Secret value: `https://your-app-name.up.railway.app`
+
+3. Click **New repository secret** again and add:
+   - Secret name: `CRON_SECRET`
+   - Secret value: Your `CRON_SECRET` from Railway variables
+
+4. **That's it!** The workflow at `.github/workflows/cron-jobs.yml` will:
+   - ✅ Run every Monday at 19:00 UTC automatically
+   - ✅ Call `/cron/ask` to ask the group
+   - ✅ Wait 10 minutes, then call `/cron/pair` to create pairs
+
+5. **Want to test?**
+   - Go to Actions tab → Connector Bot Cron Jobs
+   - Click "Run workflow" to trigger immediately
+
+**Customize timing (optional):**
+Edit `.github/workflows/cron-jobs.yml` and change:
+```yaml
+schedule:
+  - cron: '0 19 * * 1'  # Change this to different time
 ```
 
-**Cron 2 - Pair (Every Monday, checks if last Monday of month)**
-```
-URL: https://your-app-name.up.railway.app/cron/pair
-Schedule: 10 19 * * 1
-Method: POST
-Header: Authorization: Bearer <your-CRON_SECRET-from-Railway>
-```
+**Clean up** (optional):
+You can delete `.github/workflows/daily-polling.yml` since registrations happen on-demand via `/start`
 
-**Cron 3 - Polling (Daily, for registrations)**
-```
-URL: https://your-app-name.up.railway.app/polling/start?duration_minutes=60
-Schedule: 0 10 * * *
-Method: POST
-Header: Authorization: Bearer <your-CRON_SECRET-from-Railway>
-```
-
-✅ **Cron Expressions Explained:**
-- `0 19 * * 1` = Every Monday at 19:00
-- `10 19 * * 1` = Every Monday at 19:10
-- `0 10 * * *` = Every day at 10:00
+**Registration**: Users message `/start` to the bot privately anytime - no polling needed!
 
 ✅ Done! Bot is now running 24/7 for ~$0.50/month
 

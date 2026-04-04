@@ -8,9 +8,9 @@ A Telegram bot that organizes monthly call connections between group members wit
 
 This bot is designed to run efficiently on Railway.app's free tier:
 - **Flask web server** - Runs 24/7 for minimal cost
-- **Cron jobs** - Triggered monthly for ask & pair operations
-- **Limited polling** - 1 hour daily for user interactions
+- **GitHub Actions cron jobs** - Triggered automatically on Mondays
 - **Lightweight database** - SQLite (can upgrade to PostgreSQL)
+- **On-demand registration** - Users can /start anytime, no scheduled polling needed
 
 See [RAILWAY_DEPLOYMENT.md](RAILWAY_DEPLOYMENT.md) for detailed deployment instructions.
 
@@ -133,34 +133,34 @@ Database file: `connector_bot.db` (created automatically)
 
 ## Running the Bot Locally
 
-The bot has two modes for local testing:
+The bot has different modes for development and testing:
 
-### Option 1: Run Polling Session (Recommended for Testing)
+### Option 1: Run Polling Session (For Testing Registration/Responses)
 
-Runs for a limited time (default 1 hour) to test registration/responses:
+For local testing only - not used in production:
 
 ```bash
 source venv/bin/activate
 python main.py
 ```
 
-### Option 2: Run Flask Server + Polling Manually
+This starts a polling session for 1 hour to test user interactions locally.
 
-For testing the full architecture:
+### Option 2: Run Flask Server Manually (For Testing Full Architecture)
+
+For testing the HTTP endpoints locally:
 
 ```bash
 # Terminal 1: Start Flask server
 source venv/bin/activate
 python server.py
 
-# Terminal 2: Start a polling session
-source venv/bin/activate
-python -c "import asyncio; from main import run_polling_session; asyncio.run(run_polling_session(60))"
-
-# Terminal 3 (after some time): Manually test cron endpoints
+# Terminal 2: In another terminal, test cron endpoints
 curl -X POST http://localhost:5000/cron/ask \
   -H "Authorization: Bearer your-secret-token"
 ```
+
+**Note:** In production (Railway), the Flask server runs 24/7 and GitHub Actions triggers the cron endpoints automatically every Monday. No polling needed!
 
 ## Stopping the Bot
 

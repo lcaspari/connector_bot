@@ -1,13 +1,15 @@
 #!/usr/bin/env python3
 """
 Telegram Bot for Monthly Group Call Scheduling
-Refactored for Railway.app with cron jobs + limited polling windows
+Deployed on Railway.app with GitHub Actions cron jobs
 
 Architecture:
-- Cron Job 1 (monthly): Triggers ask_for_calls → sends message to group
-- Polling Window 1 (10 min): Bot polls for group responses 
-- Cron Job 2 (monthly): Triggers pair_and_notify
-- Polling Window 2 (1 hour daily): Bot polls for registrations and private chat updates
+- Flask Web Server: Runs 24/7 to handle HTTP requests and user interactions
+- GitHub Actions Cron Jobs (Every Monday):
+  * 19:00 UTC: ask_for_calls - Asks group if they have time
+  * 19:10 UTC: pair_and_notify - Creates pairs and notifies callers
+- User Registration: On-demand via /start command (anytime)
+- Database: SQLite for storing users, responses, and job execution history
 """
 
 import sqlite3
@@ -388,7 +390,8 @@ async def send_ask_for_calls(bot):
             chat_id=GROUP_CHAT_ID,
             text="🎤 *Monthly Call Check-in!* 🎤\n\n"
                  "Hey everyone! Do you have time for a call in about 10 minutes? "
-                 "Let me know below! ⬇️",
+                 "Let me know below! ⬇️\n\n"
+                 "_Note: If you haven't registered yet, send /start to me in a private chat first!_",
             reply_markup=reply_markup,
             parse_mode="Markdown"
         )

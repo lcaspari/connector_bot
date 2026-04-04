@@ -4,13 +4,13 @@ This guide explains how to deploy the Telegram bot on Railway.app using their fr
 
 ## Architecture Overview
 
-Instead of running the bot 24/7 (which uses free tier resources), the bot uses:
+The bot uses this architecture for minimal resource usage:
 
-1. **Flask Web Server** - Runs 24/7 to handle HTTP requests
-2. **Cron Jobs** - Trigger `ask_for_calls` (monthly) and `pair_and_notify` (monthly)
-3. **Polling Sessions** - Short 1-hour polling window daily for user interactions (registration, responses)
+1. **Flask Web Server** - Runs 24/7 to handle HTTP requests and user interactions
+2. **GitHub Actions Cron Jobs** - Automatically trigger `ask_for_calls` and `pair_and_notify` every Monday
+3. **SQLite Database** - Tracks users, responses, and job execution history
 
-This approach uses minimal resources and stays within Railway's free tier!
+This approach uses minimal resources (typically <$1/month) and stays well within Railway's free tier!
 
 ## Step 1: Prepare Your Bot Token
 
@@ -48,11 +48,9 @@ In Railway dashboard:
 | `BOT_TOKEN` | Your Telegram bot token | Required |
 | `CRON_SECRET` | `change-me-to-something-secure` | Change this! Used to authorize cron jobs |
 | `GROUP_CHAT_ID` | Leave blank initially | Will be set after bot joins your group |
-| `CALL_DAY` | `1` | **Deprecated:** Left for backward compatibility |
 | `CALL_HOUR` | `19` | Used to calculate time on last Monday |
 | `CALL_MINUTE` | `0` | Used to calculate time on last Monday |
 | `TIMEZONE` | `Europe/Berlin` | Used to determine "last Monday" of month |
-| `POLLING_DURATION` | `60` | Minutes to run polling session daily |
 
 ### Example Timezone Values
 - `Europe/Berlin` - Central Europe
@@ -82,9 +80,70 @@ The bot automatically detects if it's the **last Monday of the month** before ex
 - **Jobs are idempotent** - safe to run multiple times per day
 - **Database tracking prevents duplicate execution** per month
 
-### Option A: Use EasyCron (Recommended for Free)
+### Option A: Use GitHub Actions (Recommended - Built-in & Free!)
 
-EasyCron.com provides free cron scheduling:
+GitHub Actions is built into GitHub and triggers directly from your repo. No external services needed!
+
+#### Setup GitHub Actions
+
+1. **Add Secrets to your Repository:**
+   - Go to GitHub → Your repository
+   - Settings → Secrets and variables → Actions
+   - Click "New repository secret"
+   - Add these two secrets:
+
+   | Secret Name | Value |
+   |-------------|-------|
+   | `RAILWAY_URL` | `https://your-railway-app.up.railway.app` |
+   | `CRON_SECRET` | Your CRON_SECRET from Railway variables |
+
+2. **The workflow is already configured!**
+   - GitHub Actions file exists at `.github/workflows/cron-jobs.yml`
+   - Automatically runs every **Monday at 19:00 UTC**
+   - Calls `/cron/ask` → waits 10 min → calls `/cron/pair`
+
+3. **Customize the schedule (optional):**
+   - Edit `.github/workflows/cron-jobs.yml`
+   - Change the `cron` value in the `schedule` section
+   - Example to run at different time:
+     ```yaml
+     on:
+       schedule:
+         - cron: '0 10 * * 1'  # Monday 10:00 UTC instead
+     ```
+
+4. **Monitor workflow runs:**
+   - Go to "Actions" tab in your GitHub repository
+   - See all scheduled and manual runs
+   - Check logs for any failures
+   - Green ✅ = Successful, Red ❌ = Failed
+
+5. **Manual trigger for testing:**
+   - Actions tab → "Connector Bot Cron Jobs"
+   - Click "Run workflow" → "Run workflow"
+   - Tests immediately without waiting for Monday
+
+#### GitHub Actions Workflow Details
+
+The file `.github/workflows/cron-jobs.yml` contains three jobs:
+
+1. **ask-for-calls** (Every Monday 19:00 UTC)
+   - Sends POST request to `/cron/ask`
+   - Bot checks: Is today last Monday of month?
+   - If yes: Sends "Do you have time for a call?" to group
+
+2. **pair-and-notify** (Every Monday 19:10 UTC)
+   - Waits 10 minutes after ask-for-calls
+   - Sends POST request to `/cron/pair`
+   - Bot pairs users & sends private notifications
+
+3. **polling-session** (Removed - Not needed)
+   - Registration now happens on demand via `/start` command
+   - No daily polling window needed
+
+### Option B: Use EasyCron (Alternative - Free External Service)
+
+If you prefer not to use GitHub Actions:
 
 1. Sign up at [easycron.com](https://www.easycron.com) (free)
 
@@ -102,12 +161,8 @@ EasyCron.com provides free cron scheduling:
    - **Authorization Header:** `Authorization: Bearer YOUR_CRON_SECRET`
    - **Description:** Pairs users and notifies - only executes on last Monday of month
 
-4. Create cron job for "Polling Session" (daily):
-   - **URL:** `https://your-railway-url.up.railway.app/polling/start?duration_minutes=60`
-   - **Cron Expression:** `0 10 * * *` (every day at 10 AM)
-   - **Method:** POST
-   - **Authorization Header:** `Authorization: Bearer YOUR_CRON_SECRET`
-   - **Description:** Daily user registration polling window
+4. **Registration:** Users can register anytime by /start messaging the bot privately
+   - No scheduled polling needed - registrations happen on-demand
 
 ### Cron Expression Guide
 
@@ -116,7 +171,7 @@ EasyCron.com provides free cron scheduling:
 │ │ │ │ └─ Day of week (0=Sunday, 1=Monday, ..., 6=Saturday)
 │ │ │ └─── Month (1-12)
 │ │ └───── Day of month (1-31)
-│ └─────── Hour (0-23)
+│ └─────── Hour (0-23 UTC)
 └───────── Minute (0-59)
 
 Examples:
@@ -185,10 +240,6 @@ curl -X POST https://your-railway-url.up.railway.app/cron/ask \
 # Test pair_and_notify
 curl -X POST https://your-railway-url.up.railway.app/cron/pair \
   -H "Authorization: Bearer YOUR_CRON_SECRET"
-
-# Test polling
-curl -X POST https://your-railway-url.up.railway.app/polling/start \
-  -H "Authorization: Bearer YOUR_CRON_SECRET"
 ```
 
 ### Test Registration & Responses
@@ -196,24 +247,28 @@ curl -X POST https://your-railway-url.up.railway.app/polling/start \
 1. In private chat with bot, send `/start`
 2. You should get a registration prompt
 3. Click to register
-4. Once registered, create test conditions or wait for next scheduled ask
+4. Once registered, wait for the next scheduled Monday ask to see full workflow
 
 ## How It Works
 
 ```
-Monthly Cycle:
-├─ Cron Job 1 (scheduled time)
+Monthly Cycle (Every Last Monday):
+├─ GitHub Actions triggers at 19:00 UTC
+│  └─ POST /cron/ask endpoint
+│  └─ Bot checks: "Is today the last Monday?" → YES
 │  └─ Sends "Do you have time for a call?" to group
-│  └─ Polling session starts (15 min) to collect responses
+│  └─ Message includes reminder to /start if not registered
 │
-├─ Cron Job 2 (10 min later)
-│  └─ Pairs users randomly
-│  └─ Sends private notifications to callers
-│
-└─ Daily
-   └─ Polling session (1 hour) handles:
-      - User registrations (/start)
-      - Private chat interactions
+└─ Wait 10 minutes, then trigger pair job (19:10 UTC)
+   ├─ POST /cron/pair endpoint  
+   ├─ Collects responses from group members
+   ├─ Pairs users randomly
+   └─ Sends private notifications to callers
+
+User Registration (Anytime):
+└─ User sends /start in private chat
+   ├─ Bot asks if they want to participate
+   └─ Saves registration to database
 ```
 
 ## Monitoring
