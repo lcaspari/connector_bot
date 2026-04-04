@@ -1,0 +1,47 @@
+{
+  "name": "connector-bot",
+  "description": "Monthly Call Connector Bot for Telegram",
+  "buildPack": "python",
+  "envs": [
+    {
+      "name": "BOT_TOKEN",
+      "description": "Telegram Bot Token from @BotFather",
+      "reference": "https://core.telegram.org/bots#botfather"
+    },
+    {
+      "name": "GROUP_CHAT_ID",
+      "description": "Telegram Group Chat ID (will be auto-set after bot joins)",
+      "optional": true
+    },
+    {
+      "name": "CRON_SECRET",
+      "description": "Secret token for cron jobs (change this!)",
+      "default": "your-secret-token-change-this"
+    },
+    {
+      "name": "CALL_DAY",
+      "description": "Day of month to send call request (1-28)",
+      "default": "1"
+    },
+    {
+      "name": "CALL_HOUR",
+      "description": "Hour to send call request (0-23)",
+      "default": "19"
+    },
+    {
+      "name": "CALL_MINUTE",
+      "description": "Minute to send call request (0-59)",
+      "default": "0"
+    },
+    {
+      "name": "TIMEZONE",
+      "description": "Timezone for scheduling (e.g., Europe/Berlin, America/New_York)",
+      "default": "Europe/Berlin"
+    },
+    {
+      "name": "POLLING_DURATION",
+      "description": "Minutes to run the polling session per day",
+      "default": "60"
+    }
+  ]
+}
