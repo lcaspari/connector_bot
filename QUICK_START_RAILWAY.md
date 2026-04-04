@@ -16,17 +16,30 @@ Get your bot running on Railway.app in 5 minutes!
 
 ### 2. Set Environment Variables
 
-In Railway dashboard → Variables:
+In Railway dashboard → Variables tab:
+
+⚠️ **IMPORTANT: Mark `BOT_TOKEN` and `CRON_SECRET` as secrets (click the lock icon!)**
 
 ```
-BOT_TOKEN=<your-telegram-token>
-CRON_SECRET=super-secret-change-this-value
+BOT_TOKEN=<your-actual-token-from-BotFather>
+CRON_SECRET=<generate-a-secure-random-string>
 CALL_DAY=1
 CALL_HOUR=19
 CALL_MINUTE=0
 TIMEZONE=Europe/Berlin
 POLLING_DURATION=60
+GROUP_CHAT_ID=<leave-blank-for-now>
 ```
+
+**How to generate a secure `CRON_SECRET`:**
+```bash
+python -c "import secrets; print(secrets.token_hex(32))"
+```
+
+**How to mark as secret in Railway:**
+1. Paste the value in the variable field
+2. Click the **lock icon 🔒** next to the variable name
+3. It's now encrypted and hidden from logs
 
 ### 3. Wait for Deployment
 
@@ -49,7 +62,7 @@ Go to [easycron.com](https://www.easycron.com):
 URL: https://your-app-name.up.railway.app/cron/ask
 Schedule: 0 19 1 * *
 Method: POST
-Header: Authorization: Bearer super-secret-change-this-value
+Header: Authorization: Bearer <your-CRON_SECRET-from-Railway>
 ```
 
 **Cron 2 - Pair (1st at 19:10)**
@@ -57,7 +70,7 @@ Header: Authorization: Bearer super-secret-change-this-value
 URL: https://your-app-name.up.railway.app/cron/pair
 Schedule: 10 19 1 * *
 Method: POST
-Header: Authorization: Bearer super-secret-change-this-value
+Header: Authorization: Bearer <your-CRON_SECRET-from-Railway>
 ```
 
 **Cron 3 - Polling (Daily at 10:00)**
@@ -65,7 +78,7 @@ Header: Authorization: Bearer super-secret-change-this-value
 URL: https://your-app-name.up.railway.app/polling/start?duration_minutes=60
 Schedule: 0 10 * * *
 Method: POST
-Header: Authorization: Bearer super-secret-change-this-value
+Header: Authorization: Bearer <your-CRON_SECRET-from-Railway>
 ```
 
 ✅ Done! Bot is now running 24/7 for ~$0.50/month
