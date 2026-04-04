@@ -14,7 +14,7 @@ import sqlite3
 import random
 import logging
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Optional, List, Tuple
 import pytz
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
@@ -47,6 +47,25 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# ==================== HELPERS ====================
+
+def is_last_monday_of_month() -> bool:
+    """
+    Check if today is the last Monday of the current month.
+    
+    Returns:
+        True if today is the last Monday of the month, False otherwise
+    """
+    today = datetime.now(TIMEZONE).date()
+    
+    # Check if today is a Monday (weekday 0 = Monday)
+    if today.weekday() != 0:
+        return False
+    
+    # Check if there's another Monday in this month
+    next_week = today + timedelta(days=7)
+    return next_week.month != today.month
+
 # ==================== DATABASE ====================
 
 def init_database():
@@ -77,6 +96,17 @@ def init_database():
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             UNIQUE(month_year, user_id),
             FOREIGN KEY(user_id) REFERENCES users(user_id)
+        )
+    """)
+    
+    # Cron execution tracking table
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS cron_executions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            job_name TEXT NOT NULL,
+            month_year TEXT NOT NULL,
+            executed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(job_name, month_year)
         )
     """)
     
@@ -174,6 +204,36 @@ def get_paired_users(month_year: str) -> List[Tuple[int, int]]:
         (month_year,)
     )
     pairs = [(row[0], row[1]) for row in c.fetchall()]
+    conn.close()
+    return pairs
+
+def job_already_executed_this_month(job_name: str) -> bool:
+    """Check if a cron job was already executed this month."""
+    conn = sqlite3.connect(DATABASE)
+    c = conn.cursor()
+    
+    month_year = datetime.now(TIMEZONE).strftime("%Y-%m")
+    c.execute(
+        "SELECT id FROM cron_executions WHERE job_name = ? AND month_year = ?",
+        (job_name, month_year)
+    )
+    result = c.fetchone()
+    conn.close()
+    return result is not None
+
+def record_job_execution(job_name: str):
+    """Record that a cron job was executed this month."""
+    conn = sqlite3.connect(DATABASE)
+    c = conn.cursor()
+    
+    month_year = datetime.now(TIMEZONE).strftime("%Y-%m")
+    c.execute(
+        "INSERT OR IGNORE INTO cron_executions (job_name, month_year) VALUES (?, ?)",
+        (job_name, month_year)
+    )
+    conn.commit()
+    conn.close()
+
 # ==================== BOT EVENT HANDLERS ====================
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -285,8 +345,9 @@ async def ask_for_calls(context: ContextTypes.DEFAULT_TYPE):
 
 async def send_ask_for_calls(bot):
     """
-    CRON JOB 1: Called monthly to ask group for participation.
-    Run this via HTTP endpoint from Railway's cron scheduler.
+    CRON JOB 1: Called to ask group for participation.
+    Only executes on the last Monday of the month.
+    Run this via HTTP endpoint from Railway's cron scheduler (weekly on Mondays).
     
     Args:
         bot: Telegram Bot instance
@@ -294,6 +355,20 @@ async def send_ask_for_calls(bot):
     Returns:
         Dict with status and message
     """
+    # Check if today is the last Monday of the month
+    if not is_last_monday_of_month():
+        return {
+            "status": "skipped",
+            "message": "Not the last Monday of the month. No action taken."
+        }
+    
+    # Check if already executed this month
+    if job_already_executed_this_month("ask_for_calls"):
+        return {
+            "status": "skipped",
+            "message": "ask_for_calls already executed this month."
+        }
+    
     if GROUP_CHAT_ID is None:
         logger.error("GROUP_CHAT_ID not set. Bot hasn't been added to group yet.")
         return {"status": "error", "message": "GROUP_CHAT_ID not set"}
@@ -317,6 +392,7 @@ async def send_ask_for_calls(bot):
             reply_markup=reply_markup,
             parse_mode="Markdown"
         )
+        record_job_execution("ask_for_calls")
         logger.info(f"Asked group for monthly call participation ({month_year})")
         return {"status": "success", "message": f"Message sent to group {GROUP_CHAT_ID}"}
     except Exception as e:
@@ -325,8 +401,9 @@ async def send_ask_for_calls(bot):
 
 async def send_pair_and_notify(bot):
     """
-    CRON JOB 2: Called after response window (e.g., 10 min later) to pair users and notify.
-    Run this via HTTP endpoint from Railway's cron scheduler.
+    CRON JOB 2: Called to pair users and send notifications.
+    Only executes on the last Monday of the month (after ask_for_calls).
+    Run this via HTTP endpoint from Railway's cron scheduler (weekly on Mondays).
     
     Args:
         bot: Telegram Bot instance
@@ -334,6 +411,20 @@ async def send_pair_and_notify(bot):
     Returns:
         Dict with status and results
     """
+    # Check if today is the last Monday of the month
+    if not is_last_monday_of_month():
+        return {
+            "status": "skipped",
+            "message": "Not the last Monday of the month. No action taken."
+        }
+    
+    # Check if already executed this month
+    if job_already_executed_this_month("pair_and_notify"):
+        return {
+            "status": "skipped",
+            "message": "pair_and_notify already executed this month."
+        }
+    
     month_year = datetime.now(TIMEZONE).strftime("%Y-%m")
     
     yes_users = get_yes_responses(month_year)
@@ -402,6 +493,8 @@ async def send_pair_and_notify(bot):
             )
         except Exception as e:
             logger.error(f"Failed to send group message: {e}")
+    
+    record_job_execution("pair_and_notify")
     
     return {
         "status": "success",

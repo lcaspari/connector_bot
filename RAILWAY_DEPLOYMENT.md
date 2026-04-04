@@ -48,10 +48,10 @@ In Railway dashboard:
 | `BOT_TOKEN` | Your Telegram bot token | Required |
 | `CRON_SECRET` | `change-me-to-something-secure` | Change this! Used to authorize cron jobs |
 | `GROUP_CHAT_ID` | Leave blank initially | Will be set after bot joins your group |
-| `CALL_DAY` | `1` | Day of month (1-28) |
-| `CALL_HOUR` | `19` | Hour in 24-hour format (0-23) |
-| `CALL_MINUTE` | `0` | Minute (0-59) |
-| `TIMEZONE` | `Europe/Berlin` | Change to your timezone |
+| `CALL_DAY` | `1` | **Deprecated:** Left for backward compatibility |
+| `CALL_HOUR` | `19` | Used to calculate time on last Monday |
+| `CALL_MINUTE` | `0` | Used to calculate time on last Monday |
+| `TIMEZONE` | `Europe/Berlin` | Used to determine "last Monday" of month |
 | `POLLING_DURATION` | `60` | Minutes to run polling session daily |
 
 ### Example Timezone Values
@@ -74,31 +74,68 @@ You should see your app running in the Railway dashboard.
 
 ## Step 5: Configure Cron Jobs
 
-Railway apps need cron jobs triggered externally (Railway doesn't have built-in cron scheduling like Heroku).
+The bot automatically detects if it's the **last Monday of the month** before executing ask/pair operations.
+
+### Smart Scheduling
+- **Cron jobs run weekly on Monday** (simple, reliable)
+- **Bot checks internally** if it's the last Monday
+- **Jobs are idempotent** - safe to run multiple times per day
+- **Database tracking prevents duplicate execution** per month
 
 ### Option A: Use EasyCron (Recommended for Free)
 
 EasyCron.com provides free cron scheduling:
 
 1. Sign up at [easycron.com](https://www.easycron.com) (free)
-2. Create cron job for "Ask for Calls" (1st of month):
-   - **URL:** `https://your-railway-url.up.railway.app/cron/ask`
-   - **Cron Expression:** `0 19 1 * *` (adjust hour/minute as needed)
-   - **Method:** POST
-   - **Authorization Header:** `Authorization: Bearer YOUR_CRON_SECRET`
-   - **Description:** Monthly call request
 
-3. Create cron job for "Pair and Notify" (10 minutes later):
-   - **URL:** `https://your-railway-url.up.railway.app/cron/pair`
-   - **Cron Expression:** `10 19 1 * *` (10 minutes after ask)
+2. Create cron job for "Ask for Calls" (every Monday):
+   - **URL:** `https://your-railway-url.up.railway.app/cron/ask`
+   - **Cron Expression:** `0 19 * * 1` (every Monday at 19:00)
    - **Method:** POST
    - **Authorization Header:** `Authorization: Bearer YOUR_CRON_SECRET`
+   - **Description:** Weekly Monday check - only executes on last Monday of month
+
+3. Create cron job for "Pair and Notify" (every Monday, 10 min later):
+   - **URL:** `https://your-railway-url.up.railway.app/cron/pair`
+   - **Cron Expression:** `10 19 * * 1` (every Monday at 19:10)
+   - **Method:** POST
+   - **Authorization Header:** `Authorization: Bearer YOUR_CRON_SECRET`
+   - **Description:** Pairs users and notifies - only executes on last Monday of month
 
 4. Create cron job for "Polling Session" (daily):
    - **URL:** `https://your-railway-url.up.railway.app/polling/start?duration_minutes=60`
-   - **Cron Expression:** `0 10 * * *` (daily at 10 AM)
+   - **Cron Expression:** `0 10 * * *` (every day at 10 AM)
    - **Method:** POST
    - **Authorization Header:** `Authorization: Bearer YOUR_CRON_SECRET`
+   - **Description:** Daily user registration polling window
+
+### Cron Expression Guide
+
+```
+* * * * * 
+│ │ │ │ └─ Day of week (0=Sunday, 1=Monday, ..., 6=Saturday)
+│ │ │ └─── Month (1-12)
+│ │ └───── Day of month (1-31)
+│ └─────── Hour (0-23)
+└───────── Minute (0-59)
+
+Examples:
+0 19 * * 1    = Every Monday at 19:00
+10 19 * * 1   = Every Monday at 19:10
+0 10 * * *    = Every day at 10:00
+30 14 * * 0   = Every Sunday at 14:30
+```
+
+### How the "Last Monday" Logic Works
+
+1. **Bot receives weekly Monday cron jobs**
+2. **Bot checks:** Is today the last Monday of the month?
+   - Monday at start of month → Do nothing
+   - Monday at middle of month → Do nothing
+   - Monday at end of month (no more Mondays this month) → Execute! ✅
+3. **Database tracking:** Records that job was executed in `cron_executions` table
+   - Prevents running twice even if cron fires again
+   - Resets monthly with new month_year
 
 ### Option B: Use Railway Background Jobs (Coming Soon)
 

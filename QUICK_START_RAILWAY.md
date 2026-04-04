@@ -23,13 +23,14 @@ In Railway dashboard → Variables tab:
 ```
 BOT_TOKEN=<your-actual-token-from-BotFather>
 CRON_SECRET=<generate-a-secure-random-string>
-CALL_DAY=1
 CALL_HOUR=19
 CALL_MINUTE=0
 TIMEZONE=Europe/Berlin
 POLLING_DURATION=60
 GROUP_CHAT_ID=<leave-blank-for-now>
 ```
+
+📅 **Smart Scheduling**: Bot automatically detects the **last Monday of each month** - no need to set a fixed date!
 
 **How to generate a secure `CRON_SECRET`:**
 ```bash
@@ -53,33 +54,41 @@ Once green, note your public URL: `https://your-app-name.up.railway.app`
 3. Check Railway logs for `Bot added to group [CHAT_ID]`
 4. Update Railway variables with `GROUP_CHAT_ID = [that ID]`
 
-### 5. Set Up Cron Jobs
+### 5. Set Up Cron Jobs (Weekly on Monday)
+
+The bot automatically checks if it's the **last Monday of the month** before executing.
+Set these cron jobs to run **weekly on Monday** - they'll only execute on the right day!
 
 Go to [easycron.com](https://www.easycron.com):
 
-**Cron 1 - Ask (1st of month at 19:00)**
+**Cron 1 - Ask (Every Monday, checks if last Monday of month)**
 ```
 URL: https://your-app-name.up.railway.app/cron/ask
-Schedule: 0 19 1 * *
+Schedule: 0 19 * * 1
 Method: POST
 Header: Authorization: Bearer <your-CRON_SECRET-from-Railway>
 ```
 
-**Cron 2 - Pair (1st at 19:10)**
+**Cron 2 - Pair (Every Monday, checks if last Monday of month)**
 ```
 URL: https://your-app-name.up.railway.app/cron/pair
-Schedule: 10 19 1 * *
+Schedule: 10 19 * * 1
 Method: POST
 Header: Authorization: Bearer <your-CRON_SECRET-from-Railway>
 ```
 
-**Cron 3 - Polling (Daily at 10:00)**
+**Cron 3 - Polling (Daily, for registrations)**
 ```
 URL: https://your-app-name.up.railway.app/polling/start?duration_minutes=60
 Schedule: 0 10 * * *
 Method: POST
 Header: Authorization: Bearer <your-CRON_SECRET-from-Railway>
 ```
+
+✅ **Cron Expressions Explained:**
+- `0 19 * * 1` = Every Monday at 19:00
+- `10 19 * * 1` = Every Monday at 19:10
+- `0 10 * * *` = Every day at 10:00
 
 ✅ Done! Bot is now running 24/7 for ~$0.50/month
 

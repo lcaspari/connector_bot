@@ -16,7 +16,9 @@ See [RAILWAY_DEPLOYMENT.md](RAILWAY_DEPLOYMENT.md) for detailed deployment instr
 
 ## Features
 
-✨ **Monthly Call Check-ins**: Asks group members on a specific date if they have time for a call
+✨ **Last Monday of Month**: Automatically triggers on the last Monday of each month (not a fixed date!)
+🎯 **Smart Scheduling**: Cron jobs run weekly, bot intelligently detects the right day
+✨ **Monthly Call Check-ins**: Asks group members if they have time for a call
 🤝 **Random Pairing**: Automatically pairs willing participants randomly
 📞 **Private Notifications**: Sends one person from each pair their assignment privately
 🤐 **Privacy**: If someone doesn't call, it remains their secret - others won't notice
@@ -77,14 +79,15 @@ pip install -r requirements.txt
 
 ### 4. Configure Schedule (Optional)
 
-In `main.py`, customize these variables:
+The bot automatically runs on the **last Monday of each month**. You can optionally customize the time:
 
 ```python
-CALL_DAY = 1           # Day of month (1-28)
-CALL_HOUR = 19         # Hour (0-23)
+CALL_HOUR = 19         # Hour (0-23) when ask/pair runs
 CALL_MINUTE = 0        # Minute (0-59)
 TIMEZONE = pytz.timezone("Europe/Berlin")  # Your timezone
 ```
+
+**Note:** `CALL_DAY` is deprecated - the bot now always uses the last Monday of the month.
 
 ### 5. Add Bot to Group
 
@@ -103,18 +106,20 @@ TIMEZONE = pytz.timezone("Europe/Berlin")  # Your timezone
 
 ### What Happens
 
-1. **On scheduled date**: Bot asks group "Do you have time for a call?"
+1. **Last Monday of every month**: Bot asks group "Do you have time for a call?"
 2. **Members respond**: Click Yes or No buttons
-3. **After 10 minutes**: Bot pairs registered "Yes" members
+3. **10 minutes later (still last Monday)**: Bot pairs registered "Yes" members
 4. **Private messages**: One person from each pair gets notification to call the other
 5. **Privacy maintained**: If someone doesn't call, no one finds out!
 
 ## How Pairing Works
 
-- If 5 people say yes: 2 pairs are created, 1 person is unpaired
-- Unpaired person doesn't know why (could be odd number or they might get paired differently next month)
-- The caller is chosen randomly from each pair
-- Only the caller is notified (to maintain privacy)
+- **Monthly cadence**: Always happens on the last Monday of the month (never skipped, automatic date detection)
+- **Smart scheduling**: Cron jobs run weekly on Mondays, bot detects "last" Monday internally
+- **Pairing logic**: If 5 people say yes → 2 pairs created, 1 person unpaired
+- **Unpaired mystery**: Person doesn't know why they weren't called (could be odd number, different pairing next month, etc.)
+- **Random selection**: The caller is chosen randomly from each pair
+- **Privacy protection**: Only the caller is notified, receiver doesn't know if they were supposed to be called
 
 ## Database
 
@@ -122,6 +127,7 @@ The bot uses SQLite for local storage:
 
 - `users` table: Stores registered users
 - `monthly_responses` table: Stores yes/no responses and pairing information
+- `cron_executions` table: Tracks monthly job executions (prevents duplicate runs)
 
 Database file: `connector_bot.db` (created automatically)
 
