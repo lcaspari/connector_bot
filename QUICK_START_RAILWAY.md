@@ -78,6 +78,14 @@ The easiest way is **GitHub Actions** - it's already set up in your repo!
    - Go to Actions tab → Connector Bot Cron Jobs
    - Click "Run workflow" to trigger immediately
 
+**Testing Tips:**
+- The workflow will skip if it's not Monday (unless you enable test mode)
+- To run the full workflow anytime during development:
+  1. Go to Railway → Variables
+  2. Add: `TEST_MODE = true`
+  3. Now you can trigger the workflow via GitHub Actions on any day
+  4. Set back to `false` when done testing
+
 **Customize timing (optional):**
 Edit `.github/workflows/cron-jobs.yml` and change:
 ```yaml

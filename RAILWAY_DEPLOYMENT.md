@@ -51,6 +51,7 @@ In Railway dashboard:
 | `CALL_HOUR` | `19` | Used to calculate time on last Monday |
 | `CALL_MINUTE` | `0` | Used to calculate time on last Monday |
 | `TIMEZONE` | `Europe/Berlin` | Used to determine "last Monday" of month |
+| `TEST_MODE` | `false` | Set to `true` to run jobs anytime (for testing) |
 
 ### Example Timezone Values
 - `Europe/Berlin` - Central Europe

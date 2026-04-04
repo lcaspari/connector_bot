@@ -127,13 +127,34 @@ Click red ❌ run to see logs. Common issues:
 
 Want to test immediately without waiting for Monday?
 
+**Option 1: Run anytime (with TEST_MODE)**
+
+1. Go to Railway dashboard → Variables
+2. Add: `TEST_MODE = true` (this bypasses the Monday date check)
+3. Go to GitHub Actions tab
+4. Click "Connector Bot Cron Jobs"
+5. Click "Run workflow" dropdown → "Run workflow"
+6. Workflow runs immediately and executes the full cycle
+7. When done testing, set `TEST_MODE = false` in Railway
+
+**Option 2: Run workflow without changes**
+
 1. Go to Actions tab
 2. Click "Connector Bot Cron Jobs"
 3. Click "Run workflow" dropdown
 4. Select branch (main)
 5. Click "Run workflow"
+6. If it's not Monday, workflow will skip (as expected)
 
-The workflow runs immediately for testing!
+### What TEST_MODE Does
+
+When `TEST_MODE = true`:
+- ✅ Runs the job regardless of the day/date
+- ✅ Bypasses the "last Monday" check
+- ✅ Allows multiple runs in the same month (for testing)
+- ✅ Useful for development and testing before production
+
+**Remember:** Set `TEST_MODE = false` after testing!
 
 ## Troubleshooting
 

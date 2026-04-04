@@ -41,6 +41,9 @@ CALL_MINUTE = int(os.getenv("CALL_MINUTE", "0"))
 TIMEZONE = pytz.timezone(os.getenv("TIMEZONE", "Europe/Berlin"))
 DATABASE = os.getenv("DATABASE", "connector_bot.db")
 
+# Test mode: allows running jobs anytime, bypasses date restrictions
+TEST_MODE = os.getenv("TEST_MODE", "false").lower() == "true"
+
 # ==================== LOGGING ====================
 
 logging.basicConfig(
@@ -357,15 +360,15 @@ async def send_ask_for_calls(bot):
     Returns:
         Dict with status and message
     """
-    # Check if today is the last Monday of the month
-    if not is_last_monday_of_month():
+    # Check if today is the last Monday of the month (skip if TEST_MODE enabled)
+    if not TEST_MODE and not is_last_monday_of_month():
         return {
             "status": "skipped",
             "message": "Not the last Monday of the month. No action taken."
         }
     
-    # Check if already executed this month
-    if job_already_executed_this_month("ask_for_calls"):
+    # Check if already executed this month (skip if TEST_MODE enabled)
+    if not TEST_MODE and job_already_executed_this_month("ask_for_calls"):
         return {
             "status": "skipped",
             "message": "ask_for_calls already executed this month."
@@ -414,15 +417,15 @@ async def send_pair_and_notify(bot):
     Returns:
         Dict with status and results
     """
-    # Check if today is the last Monday of the month
-    if not is_last_monday_of_month():
+    # Check if today is the last Monday of the month (skip if TEST_MODE enabled)
+    if not TEST_MODE and not is_last_monday_of_month():
         return {
             "status": "skipped",
             "message": "Not the last Monday of the month. No action taken."
         }
     
-    # Check if already executed this month
-    if job_already_executed_this_month("pair_and_notify"):
+    # Check if already executed this month (skip if TEST_MODE enabled)
+    if not TEST_MODE and job_already_executed_this_month("pair_and_notify"):
         return {
             "status": "skipped",
             "message": "pair_and_notify already executed this month."
