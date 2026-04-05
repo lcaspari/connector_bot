@@ -18,7 +18,7 @@ from main import (
     BOT_TOKEN,
     logger as main_logger
 )
-from telegram import Bot
+from telegram import Bot, Update
 
 # Configure logging
 logging.basicConfig(
@@ -155,46 +155,38 @@ def internal_error(error):
 
 # ==================== BACKGROUND POLLING ====================
 
-async def start_polling_and_run(app):
-    """Start the bot polling updater and let it run continuously."""
-    await app.initialize()
-    await app.start()
+async def run_bot_polling():
+    """
+    Run bot polling using Application.run_polling().
+    This lets the library manage the event loop properly.
+    """
+    logger.info("Building Telegram bot application...")
+    app = await build_app()
+    logger.info("✓ Bot application built successfully")
     
-    try:
-        logger.info("Bot polling started and running continuously...")
-        # This will run until the app is stopped
-        await app.updater.start_polling(allowed_updates=Update.ALL_TYPES, timeout=30)
-    except Exception as e:
-        logger.error(f"Polling error: {e}", exc_info=True)
-        raise
-    finally:
-        await app.updater.stop()
-        await app.stop()
-        await app.shutdown()
+    logger.info("Starting bot with polling...")
+    # run_polling() manages the event loop internally
+    await app.run_polling(allowed_updates=Update.ALL_TYPES, timeout=30)
 
 def polling_worker():
     """
-    Background worker that runs bot polling continuously.
-    Creates a single event loop for the entire lifetime of the worker.
+    Background worker that continuously polls for Telegram updates.
+    This allows the bot to respond to user messages like /start.
+    
+    Runs indefinitely in its own event loop.
     """
     logger.info("=" * 70)
     logger.info("Starting background polling worker...")
     logger.info(f"BOT_TOKEN set: {bool(BOT_TOKEN and BOT_TOKEN != 'YOUR_BOT_TOKEN_HERE')}")
     logger.info("=" * 70)
     
-    # Create ONE event loop for this thread (not multiple)
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    
     try:
-        # Build the app once
-        logger.info("Building bot application...")
-        app = loop.run_until_complete(build_app())
-        logger.info("✓ Bot application built successfully")
+        # Create a fresh event loop for this thread
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
         
-        # Start polling - this will run until interrupted
-        logger.info("Starting polling...")
-        loop.run_until_complete(start_polling_and_run(app))
+        # Let Application.run_polling() manage the polling
+        loop.run_until_complete(run_bot_polling())
         
     except KeyboardInterrupt:
         logger.info("Polling worker stopped via KeyboardInterrupt")
@@ -202,7 +194,10 @@ def polling_worker():
         logger.error(f"Fatal polling error: {type(e).__name__}: {e}", exc_info=True)
     finally:
         logger.info("Closing event loop...")
-        loop.close()
+        try:
+            loop.close()
+        except:
+            pass
         logger.info("Polling worker thread ended")
 
 def start_background_polling():

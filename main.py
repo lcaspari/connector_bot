@@ -660,16 +660,18 @@ async def run_polling_session(duration_minutes: int = 60):
     
     logger.info(f"Starting polling session for {duration_minutes} minutes...")
     
-    # Start polling with timeout
-    async with app.updater:
-        await app.updater.start_polling(allowed_updates=Update.ALL_TYPES, timeout=30)
-        
-        # Keep polling for specified duration
-        import asyncio
-        await asyncio.sleep(duration_minutes * 60)
-        
-        # Clean shutdown
-        await app.updater.stop()
+    try:
+        # Start polling with timeout
+        async with app.updater:
+            await app.updater.start_polling(allowed_updates=Update.ALL_TYPES, timeout=30)
+            
+            # Keep polling for specified duration
+            import asyncio
+            await asyncio.sleep(duration_minutes * 60)
+            
+            # Clean shutdown
+            await app.updater.stop()
+    finally:
         await app.stop()
         await app.shutdown()
     
