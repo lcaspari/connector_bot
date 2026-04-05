@@ -160,33 +160,49 @@ def polling_worker():
     Background worker that continuously polls for Telegram updates.
     This allows the bot to respond to user messages like /start.
     """
+    logger.info("=" * 60)
     logger.info("Starting background polling worker...")
+    logger.info(f"BOT_TOKEN set: {bool(BOT_TOKEN and BOT_TOKEN != 'YOUR_BOT_TOKEN_HERE')}")
+    logger.info("=" * 60)
+    
+    retry_count = 0
     while True:
         try:
+            retry_count += 1
+            logger.info(f"Polling iteration {retry_count}: Starting 5-minute polling session...")
+            
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
+            
             # Run polling for 5 minutes at a time, then retry
             # This allows graceful shutdown and recovery
             loop.run_until_complete(run_polling_session(duration_minutes=5))
             loop.close()
+            
+            logger.info(f"Polling iteration {retry_count}: Session completed, restarting...")
+            
         except Exception as e:
-            logger.error(f"Polling worker error: {e}")
+            logger.error(f"Polling worker error (iteration {retry_count}): {type(e).__name__}: {e}", exc_info=True)
             # Wait before retrying to avoid spamming logs
+            logger.info("Waiting 5 seconds before retry...")
             time.sleep(5)
         except KeyboardInterrupt:
-            logger.info("Polling worker stopped")
+            logger.info("Polling worker stopped via KeyboardInterrupt")
             break
 
 def start_background_polling():
     """Start the background polling thread."""
     # Only start if BOT_TOKEN is set
     if not BOT_TOKEN or BOT_TOKEN == "YOUR_BOT_TOKEN_HERE":
-        logger.warning("BOT_TOKEN not set. Skipping background polling.")
+        logger.error("❌ BOT_TOKEN not set or is placeholder. Background polling disabled!")
+        logger.error("   Please set BOT_TOKEN environment variable in Railway.")
         return
     
+    logger.info("✓ BOT_TOKEN is configured, starting polling thread...")
     thread = threading.Thread(target=polling_worker, daemon=True)
     thread.start()
-    logger.info("Background polling thread started (daemon)")
+    logger.info("✓ Background polling thread started (daemon)")
+    logger.info("  Bot will now respond to user messages like /start")
 
 if __name__ == "__main__":
     port = int(os.getenv("PORT", 5000))
