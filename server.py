@@ -1,12 +1,14 @@
 #!/usr/bin/env python3
 """
 Flask Server for Railway.app Integration
-Handles HTTP endpoints for cron job triggers
+Handles HTTP endpoints for cron job triggers + background polling for user messages
 """
 
 import logging
 import os
 import asyncio
+import threading
+import time
 from flask import Flask, jsonify, request
 from main import (
     build_app,
@@ -151,7 +153,47 @@ def internal_error(error):
     logger.error(f"Internal server error: {error}")
     return jsonify({"error": "Internal server error"}), 500
 
+# ==================== BACKGROUND POLLING ====================
+
+def polling_worker():
+    """
+    Background worker that continuously polls for Telegram updates.
+    This allows the bot to respond to user messages like /start.
+    """
+    logger.info("Starting background polling worker...")
+    while True:
+        try:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            # Run polling for 5 minutes at a time, then retry
+            # This allows graceful shutdown and recovery
+            loop.run_until_complete(run_polling_session(duration_minutes=5))
+            loop.close()
+        except Exception as e:
+            logger.error(f"Polling worker error: {e}")
+            # Wait before retrying to avoid spamming logs
+            time.sleep(5)
+        except KeyboardInterrupt:
+            logger.info("Polling worker stopped")
+            break
+
+def start_background_polling():
+    """Start the background polling thread."""
+    # Only start if BOT_TOKEN is set
+    if not BOT_TOKEN or BOT_TOKEN == "YOUR_BOT_TOKEN_HERE":
+        logger.warning("BOT_TOKEN not set. Skipping background polling.")
+        return
+    
+    thread = threading.Thread(target=polling_worker, daemon=True)
+    thread.start()
+    logger.info("Background polling thread started (daemon)")
+
 if __name__ == "__main__":
     port = int(os.getenv("PORT", 5000))
     logger.info(f"Starting Flask server on port {port}")
-    app.run(host="0.0.0.0", port=port, debug=False)
+    
+    # Start background polling in a daemon thread
+    start_background_polling()
+    
+    # Start Flask server (blocking)
+    app.run(host="0.0.0.0", port=port, debug=False, threaded=True)

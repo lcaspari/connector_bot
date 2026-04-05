@@ -6,9 +6,20 @@ This guide explains how to deploy the Telegram bot on Railway.app using their fr
 
 The bot uses this architecture for minimal resource usage:
 
-1. **Flask Web Server** - Runs 24/7 to handle HTTP requests and user interactions
-2. **GitHub Actions Cron Jobs** - Automatically trigger `ask_for_calls` and `pair_and_notify` every Monday
-3. **SQLite Database** - Tracks users, responses, and job execution history
+1. **Flask Web Server** (Main Process)
+   - Runs 24/7 on Railway
+   - Handles cron job HTTP endpoints (`/cron/ask`, `/cron/pair`)
+   - Includes background polling thread for user messages (responds to `/start` commands anytime)
+
+2. **GitHub Actions Cron Jobs** 
+   - Automatically trigger every Monday at 19:00 UTC + 19:10 UTC
+   - Calls the Flask server endpoints via HTTP
+
+3. **SQLite Database** 
+   - Tracks users, responses, and job execution history
+   - Persists between deployments
+
+**How it works:** The Flask server runs a daemon polling thread in the background that listens for all Telegram updates (like `/start` commands), while also serving HTTP endpoints for the scheduled cron jobs. This allows users to register anytime and the bot to respond to commands immediately, not just at scheduled times.
 
 This approach uses minimal resources (typically <$1/month) and stays well within Railway's free tier!
 
