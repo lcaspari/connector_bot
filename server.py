@@ -204,12 +204,16 @@ def start_background_polling():
     logger.info("✓ Background polling thread started (daemon)")
     logger.info("  Bot will now respond to user messages like /start")
 
+# ==================== START POLLING WHEN APP LOADS ====================
+# This runs when the app is imported by gunicorn, not just when run directly
+logger.info("=" * 70)
+logger.info("Flask app initialized. Starting background polling thread...")
+logger.info("=" * 70)
+start_background_polling()
+
 if __name__ == "__main__":
     port = int(os.getenv("PORT", 5000))
     logger.info(f"Starting Flask server on port {port}")
     
-    # Start background polling in a daemon thread
-    start_background_polling()
-    
     # Start Flask server (blocking)
-    app.run(host="0.0.0.0", port=port, debug=False, threaded=True)
+    # Note: Polling thread already started above at module import time
