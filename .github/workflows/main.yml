@@ -15,9 +15,7 @@ jobs:
     steps:
       - name: Trigger /cron/ask endpoint
         run: |
-          curl -X POST ${{ secrets.RAILWAY_URL }}/cron/ask \
-            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
-            -H "Content-Type: application/json" \
+          curl -X POST "${{ secrets.RAILWAY_URL }}/cron/ask?secret=${{ secrets.CRON_SECRET }}" \
             --fail-with-body
       - name: Check response
         if: failure()
@@ -33,9 +31,7 @@ jobs:
       
       - name: Trigger /cron/pair endpoint
         run: |
-          curl -X POST ${{ secrets.RAILWAY_URL }}/cron/pair \
-            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
-            -H "Content-Type: application/json" \
+          curl -X POST "${{ secrets.RAILWAY_URL }}/cron/pair?secret=${{ secrets.CRON_SECRET }}" \
             --fail-with-body
       - name: Check response
         if: failure()

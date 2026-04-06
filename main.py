@@ -288,7 +288,7 @@ async def register_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Show help information."""
     await update.message.reply_text(
-        "📱 *Connector Bot Help*\n\n"
+        "*Connector Bot Help*\n\n"
         "*Commands:*\n"
         "/start - Register with the bot\n"
         "/help - Show this help message\n"
@@ -298,7 +298,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "2. You respond with Yes or No\n"
         "3. If you say yes, you might get paired with someone\n"
         "4. I'll message you privately who to call\n"
-        "5. If you don't call, it's your secret - no one will know! 🤐",
+        "5. If you don't call, it's your secret - no one will know!",
         parse_mode="Markdown"
     )
 
