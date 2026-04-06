@@ -394,7 +394,8 @@ async def send_ask_for_calls(bot):
             text="🎤 *Monthly Call Check-in!* 🎤\n\n"
                  "Hey everyone! Do you have time for a call in about 10 minutes? "
                  "Let me know below! ⬇️\n\n"
-                 "_Note: If you haven't registered yet, send /start to me in a private chat first!_",
+                 "_⚠️ Important: To receive your private pairing assignment, "
+                 "start a chat with me by sending /start in private messages!_",
             reply_markup=reply_markup,
             parse_mode="Markdown"
         )
@@ -456,8 +457,10 @@ async def send_pair_and_notify(bot):
     
     save_pairs(month_year, pairs)
     
-    # Send notifications
+    # Send notifications privately to callers
     notification_count = 0
+    failed_users = []
+    
     for caller_id, receiver_id in pairs:
         try:
             conn = sqlite3.connect(DATABASE)
@@ -480,21 +483,28 @@ async def send_pair_and_notify(bot):
             logger.info(f"Notified user {caller_id} to call {receiver_id}")
         except Exception as e:
             logger.error(f"Failed to notify user {caller_id}: {e}")
+            failed_users.append(caller_id)
     
-    # Notify group
+    # Notify group that pairing is complete
     if GROUP_CHAT_ID:
         paired_count = len(pairs)
         unpaired_text = ""
         if len(yes_users) % 2 == 1:
             unpaired_text = f"\n(One person got a surprise day off this month! 🎁)"
         
+        failed_text = ""
+        if failed_users:
+            failed_text = (f"\n\n⚠️ _Note: {len(failed_users)} person(s) didn't receive their "
+                          f"assignment (they may not have started a chat with the bot). "
+                          f"Please start the bot with /start to receive your assignment._")
+        
         try:
             await bot.send_message(
                 chat_id=GROUP_CHAT_ID,
                 text=f"✅ *Pairs created!* ✅\n\n"
                      f"{paired_count} pair{'s' if paired_count != 1 else ''} have been assigned. "
-                     f"Those who were selected to call have received their assignments privately. "
-                     f"Good luck! 🍀{unpaired_text}",
+                     f"Those selected to call have received their assignments privately. "
+                     f"Good luck! 🍀{unpaired_text}{failed_text}",
                 parse_mode="Markdown"
             )
         except Exception as e:
