@@ -615,10 +615,10 @@ async def handle_new_group_member(update: Update, context: ContextTypes.DEFAULT_
             if member.is_bot and member.username == (await context.bot.get_me()).username:
                 GROUP_CHAT_ID = update.message.chat_id
                 await update.message.reply_text(
-                    "👋 Hi everyone! I'm the Call Connector Bot.\n\n"
+                    "Hi! I'm Avalokiteshvara, but lowkey - people just call me Avaloki, the Call Connector Bot.\n\n"
                     "I'll ask you once a month if you have time for a call, "
                     "and I'll randomly pair you with someone else to chat. "
-                    "No pressure - if you don't call, it's between us! 🤐\n\n"
+                    "but no pressure - if you don't call, it stays between us, hihi :)\n\n"
                     "Use /start in private chat to register with me."
                 )
                 logger.info(f"Bot added to group {GROUP_CHAT_ID}")
