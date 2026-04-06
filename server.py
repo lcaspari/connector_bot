@@ -13,6 +13,7 @@ Telegram sends POSTs to /telegram instead of us polling for updates.
 
 import logging
 import os
+import asyncio
 from flask import Flask, jsonify, request
 from main import (
     send_ask_for_calls,
@@ -45,7 +46,7 @@ def health():
 # ==================== TELEGRAM WEBHOOK ====================
 
 @app.route("/telegram", methods=["POST"])
-async def telegram_webhook():
+def telegram_webhook():
     """
     Receive updates from Telegram via webhook.
     Telegram sends POST requests here when users interact with the bot.
@@ -62,8 +63,8 @@ async def telegram_webhook():
         update_id = update_data.get("update_id", "unknown")
         logger.info(f"Received telegram update {update_id}")
         
-        # Process the update
-        success = await process_telegram_update(update_data)
+        # Process the update (call async function synchronously)
+        success = asyncio.run(process_telegram_update(update_data))
         
         # Always return 200 OK to Telegram (even if we failed to process)
         # Telegram won't retry if we return 200
@@ -77,7 +78,7 @@ async def telegram_webhook():
 # ==================== CRON JOB ENDPOINTS ====================
 
 @app.route("/cron/ask", methods=["GET", "POST"])
-async def cron_ask():
+def cron_ask():
     """
     Cron job endpoint: Ask group for participation.
     Called by GitHub Actions on the last Monday of month at 19:00 UTC.
@@ -97,7 +98,7 @@ async def cron_ask():
     
     try:
         bot = Bot(token=BOT_TOKEN)
-        result = await send_ask_for_calls(bot)
+        result = asyncio.run(send_ask_for_calls(bot))
         logger.info(f"Cron ask result: {result}")
         return jsonify(result), 200
     except Exception as e:
@@ -105,7 +106,7 @@ async def cron_ask():
         return jsonify({"status": "error", "message": str(e)}), 500
 
 @app.route("/cron/pair", methods=["GET", "POST"])
-async def cron_pair():
+def cron_pair():
     """
     Cron job endpoint: Pair users and send notifications.
     Called by GitHub Actions on the last Monday of month at 19:10 UTC (10 min after ask).
@@ -125,7 +126,7 @@ async def cron_pair():
     
     try:
         bot = Bot(token=BOT_TOKEN)
-        result = await send_pair_and_notify(bot)
+        result = asyncio.run(send_pair_and_notify(bot))
         logger.info(f"Cron pair result: {result}")
         return jsonify(result), 200
     except Exception as e:
