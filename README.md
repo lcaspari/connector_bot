@@ -8,11 +8,13 @@ A Telegram bot that organizes monthly call connections between group members wit
 
 This bot is designed to run efficiently on Railway.app's free tier:
 - **Flask web server** - Runs 24/7 for minimal cost
+- **Telegram webhooks** - Bot receives updates instantly via HTTP POST (no polling needed!)
 - **GitHub Actions cron jobs** - Triggered automatically on Mondays
 - **Lightweight database** - SQLite (can upgrade to PostgreSQL)
-- **On-demand registration** - Users can /start anytime, no scheduled polling needed
+- **On-demand registration** - Users can /start anytime and get instant responses
 
-See [RAILWAY_DEPLOYMENT.md](RAILWAY_DEPLOYMENT.md) for detailed deployment instructions.
+See [RAILWAY_DEPLOYMENT.md](RAILWAY_DEPLOYMENT.md) for detailed deployment instructions.  
+See [TELEGRAM_WEBHOOK_SETUP.md](TELEGRAM_WEBHOOK_SETUP.md) for webhook configuration.
 
 ## Features
 
@@ -133,20 +135,7 @@ Database file: `connector_bot.db` (created automatically)
 
 ## Running the Bot Locally
 
-The bot has different modes for development and testing:
-
-### Option 1: Run Polling Session (For Testing Registration/Responses)
-
-For local testing only - not used in production:
-
-```bash
-source venv/bin/activate
-python main.py
-```
-
-This starts a polling session for 1 hour to test user interactions locally.
-
-### Option 2: Run Flask Server Manually (For Testing Full Architecture)
+### Run Flask Server (For Testing)
 
 For testing the HTTP endpoints locally:
 
@@ -160,7 +149,13 @@ curl -X POST http://localhost:5000/cron/ask \
   -H "Authorization: Bearer your-secret-token"
 ```
 
-**Note:** In production (Railway), the Flask server runs 24/7 and GitHub Actions triggers the cron endpoints automatically every Monday. No polling needed!
+This starts a local Flask server. In production (Railway), the server runs 24/7 and automatically receives webhook updates from Telegram.
+
+### Webhook Configuration
+
+For production deployment on Railway, you need to register the webhook with Telegram so it sends updates to your bot.
+
+See **[TELEGRAM_WEBHOOK_SETUP.md](TELEGRAM_WEBHOOK_SETUP.md)** for complete webhook setup instructions.
 
 ## Stopping the Bot
 
