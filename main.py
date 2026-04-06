@@ -646,43 +646,32 @@ def build_app_sync() -> Application:
     
     return app
 
-async def build_app() -> Application:
+async def process_telegram_update(update_data: dict) -> bool:
     """
-    Async wrapper for build_app_sync (for backward compatibility).
-    """
-    return build_app_sync()
-
-async def run_polling_session(duration_minutes: int = 60):
-    """
-    Run the bot in polling mode for a limited time.
-    Used for handling registrations and responses.
+    Process a single Telegram update from webhook.
     
     Args:
-        duration_minutes: How long to poll (default 60 minutes for registration window)
+        update_data: Raw update dict from Telegram
+    
+    Returns:
+        True if processed successfully, False otherwise
     """
-    app = await build_app()
-    
-    await app.initialize()
-    await app.start()
-    
-    logger.info(f"Starting polling session for {duration_minutes} minutes...")
-    
     try:
-        # Start polling with timeout
-        async with app.updater:
-            await app.updater.start_polling(allowed_updates=Update.ALL_TYPES, timeout=30)
-            
-            # Keep polling for specified duration
-            import asyncio
-            await asyncio.sleep(duration_minutes * 60)
-            
-            # Clean shutdown
-            await app.updater.stop()
-    finally:
-        await app.stop()
-        await app.shutdown()
-    
-    logger.info("Polling session ended")
+        # Create temporary app just for processing this update
+        app = build_app_sync()
+        
+        # Convert dict to Update object
+        update = Update.de_json(update_data, None)
+        if not update:
+            logger.warning("Failed to deserialize update")
+            return False
+        
+        # Process the update through handlers
+        await app.process_update(update)
+        return True
+    except Exception as e:
+        logger.error(f"Failed to process update: {e}", exc_info=True)
+        return False
 
 if __name__ == "__main__":
     import asyncio

@@ -1,22 +1,24 @@
 #!/usr/bin/env python3
 """
 Flask Server for Railway.app Integration
-Handles HTTP endpoints for cron job triggers + background polling for user messages
+Handles HTTP endpoints for:
+- /telegram - Webhook for receiving Telegram updates (POST)
+- /cron/ask - HTTP endpoint for asking group (GET/POST with ?secret=...)
+- /cron/pair - HTTP endpoint for pairing and notifying (GET/POST with ?secret=...)
+- /health - Health check for Railway (GET)
+
+IMPORTANT: Switch from polling to webhooks to avoid Updater threading issues.
+Telegram sends POSTs to /telegram instead of us polling for updates.
 """
 
 import logging
 import os
-import asyncio
-import threading
-import time
 from flask import Flask, jsonify, request
 from main import (
     send_ask_for_calls,
     send_pair_and_notify,
-    run_polling_session,
-    build_app_sync,
+    process_telegram_update,
     BOT_TOKEN,
-    logger as main_logger
 )
 from telegram import Bot
 
@@ -27,231 +29,121 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# ==================== FLASK APP SETUP ====================
+
 app = Flask(__name__)
+CRON_SECRET = os.getenv("CRON_SECRET", "your-secret-here")
+WEBHOOK_URL = os.getenv("WEBHOOK_URL", "https://your-app.railway.app/telegram")
 
-# Security: Require a secret token for cron job endpoints
-CRON_SECRET = os.getenv("CRON_SECRET", "your-secret-token-change-this")
-
-def verify_cron_secret(request):
-    """Verify the cron job secret token."""
-    token = request.headers.get("Authorization", "")
-    if token != f"Bearer {CRON_SECRET}":
-        return False
-    return True
+# ==================== HEALTH CHECK ====================
 
 @app.route("/health", methods=["GET"])
 def health():
     """Health check endpoint for Railway."""
-    return jsonify({"status": "ok"}), 200
+    return jsonify({"status": "healthy"}), 200
 
-@app.route("/cron/ask", methods=["POST"])
-def cron_ask_for_calls():
+# ==================== TELEGRAM WEBHOOK ====================
+
+@app.route("/telegram", methods=["POST"])
+async def telegram_webhook():
     """
-    Cron job endpoint to trigger ask_for_calls.
+    Receive updates from Telegram via webhook.
+    Telegram sends POST requests here when users interact with the bot.
+    This replaces polling - much more efficient!
+    """
+    try:
+        # Get the update from Telegram
+        update_data = request.get_json()
+        
+        if not update_data:
+            logger.warning("Received empty webhook request")
+            return jsonify({"ok": False}), 400
+        
+        update_id = update_data.get("update_id", "unknown")
+        logger.info(f"Received telegram update {update_id}")
+        
+        # Process the update
+        success = await process_telegram_update(update_data)
+        
+        # Always return 200 OK to Telegram (even if we failed to process)
+        # Telegram won't retry if we return 200
+        return jsonify({"ok": True}), 200
+            
+    except Exception as e:
+        logger.error(f"Webhook error: {e}", exc_info=True)
+        # Still return 200 so Telegram doesn't retry
+        return jsonify({"ok": True}), 200
+
+# ==================== CRON JOB ENDPOINTS ====================
+
+@app.route("/cron/ask", methods=["GET", "POST"])
+async def cron_ask():
+    """
+    Cron job endpoint: Ask group for participation.
+    Called by GitHub Actions on the last Monday of month at 19:00 UTC.
     
-    Set up in Railway:
-    - POST /cron/ask
-    - Scheduled for: 1st of month at desired time
-    - Add header: Authorization: Bearer {CRON_SECRET}
+    Usage:
+    - GET /cron/ask?secret=YOUR_CRON_SECRET
+    - POST /cron/ask with JSON: {"secret": "YOUR_CRON_SECRET"}
     """
-    if not verify_cron_secret(request):
+    # Validate secret from query param or JSON body
+    secret = request.args.get("secret")
+    if not secret and request.is_json:
+        secret = request.get_json().get("secret")
+    
+    if secret != CRON_SECRET:
+        logger.warning(f"Unauthorized cron request to /cron/ask")
         return jsonify({"error": "Unauthorized"}), 401
     
     try:
-        logger.info("Cron job triggered: ask_for_calls")
         bot = Bot(token=BOT_TOKEN)
-        
-        # Run the async function
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        result = loop.run_until_complete(send_ask_for_calls(bot))
-        loop.close()
-        
-        logger.info(f"Cron result: {result}")
-        return jsonify({
-            "status": "success",
-            "message": "ask_for_calls triggered",
-            "result": result
-        }), 200
+        result = await send_ask_for_calls(bot)
+        logger.info(f"Cron ask result: {result}")
+        return jsonify(result), 200
     except Exception as e:
-        logger.error(f"Error in cron_ask_for_calls: {e}")
-        return jsonify({"error": str(e)}), 500
+        logger.error(f"Cron ask error: {e}", exc_info=True)
+        return jsonify({"status": "error", "message": str(e)}), 500
 
-@app.route("/cron/pair", methods=["POST"])
-def cron_pair_and_notify():
+@app.route("/cron/pair", methods=["GET", "POST"])
+async def cron_pair():
     """
-    Cron job endpoint to trigger pair_and_notify.
+    Cron job endpoint: Pair users and send notifications.
+    Called by GitHub Actions on the last Monday of month at 19:10 UTC (10 min after ask).
     
-    Set up in Railway:
-    - POST /cron/pair
-    - Scheduled for: 1st of month, ~10 min after ask_for_calls
-    - Add header: Authorization: Bearer {CRON_SECRET}
+    Usage:
+    - GET /cron/pair?secret=YOUR_CRON_SECRET
+    - POST /cron/pair with JSON: {"secret": "YOUR_CRON_SECRET"}
     """
-    if not verify_cron_secret(request):
+    # Validate secret from query param or JSON body
+    secret = request.args.get("secret")
+    if not secret and request.is_json:
+        secret = request.get_json().get("secret")
+    
+    if secret != CRON_SECRET:
+        logger.warning(f"Unauthorized cron request to /cron/pair")
         return jsonify({"error": "Unauthorized"}), 401
     
     try:
-        logger.info("Cron job triggered: pair_and_notify")
         bot = Bot(token=BOT_TOKEN)
-        
-        # Run the async function
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        result = loop.run_until_complete(send_pair_and_notify(bot))
-        loop.close()
-        
-        logger.info(f"Cron result: {result}")
-        return jsonify({
-            "status": "success",
-            "message": "pair_and_notify triggered",
-            "result": result
-        }), 200
+        result = await send_pair_and_notify(bot)
+        logger.info(f"Cron pair result: {result}")
+        return jsonify(result), 200
     except Exception as e:
-        logger.error(f"Error in cron_pair_and_notify: {e}")
-        return jsonify({"error": str(e)}), 500
+        logger.error(f"Cron pair error: {e}", exc_info=True)
+        return jsonify({"status": "error", "message": str(e)}), 500
 
-@app.route("/polling/start", methods=["POST"])
-def start_polling():
-    """
-    Start a polling session for user interactions.
-    
-    Set up in Railway:
-    - POST /polling/start
-    - Scheduled daily for 1 hour
-    - Optional query param: duration_minutes (default 60)
-    - Add header: Authorization: Bearer {CRON_SECRET}
-    """
-    if not verify_cron_secret(request):
-        return jsonify({"error": "Unauthorized"}), 401
-    
-    try:
-        duration = request.args.get("duration_minutes", 60, type=int)
-        logger.info(f"Starting polling session for {duration} minutes")
-        
-        # Run the async polling session
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        loop.run_until_complete(run_polling_session(duration))
-        loop.close()
-        
-        return jsonify({
-            "status": "success",
-            "message": f"Polling session completed ({duration} minutes)"
-        }), 200
-    except Exception as e:
-        logger.error(f"Error in start_polling: {e}")
-        return jsonify({"error": str(e)}), 500
+# ==================== STARTUP ====================
 
-@app.errorhandler(404)
-def not_found(error):
-    """Handle 404 errors."""
-    return jsonify({"error": "Not found"}), 404
-
-@app.errorhandler(500)
-def internal_error(error):
-    """Handle 500 errors."""
-    logger.error(f"Internal server error: {error}")
-    return jsonify({"error": "Internal server error"}), 500
-
-# ==================== BACKGROUND POLLING ====================
-
-# Global app instance - created at module level in main thread
-_bot_app = None
-
-def polling_worker():
-    """
-    Background worker that runs bot polling continuously.
-    Uses the pre-built app created at module import time.
-    """
-    global _bot_app
-    
-    logger.info("=" * 70)
-    logger.info("Starting background polling worker...")
-    logger.info(f"BOT_TOKEN set: {bool(BOT_TOKEN and BOT_TOKEN != 'YOUR_BOT_TOKEN_HERE')}")
-    logger.info(f"App instance available: {_bot_app is not None}")
-    logger.info("=" * 70)
-    
-    if _bot_app is None:
-        logger.error("Bot app is not initialized! Cannot start polling.")
-        return
-    
-    retry_count = 0
-    while True:
-        try:
-            retry_count += 1
-            logger.info(f"Polling attempt {retry_count}: Starting 24-hour polling session...")
-            
-            # Create event loop for this thread
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-            
-            # Initialize and start the app
-            loop.run_until_complete(_bot_app.initialize())
-            loop.run_until_complete(_bot_app.start())
-            
-            # Run polling with timeout
-            logger.info("Bot polling started - listening for user messages")
-            loop.run_until_complete(
-                _bot_app.updater.start_polling(allowed_updates="all", timeout=30)
-            )
-            
-            logger.info(f"Polling session ended, will restart...")
-            
-        except KeyboardInterrupt:
-            logger.info("Polling worker stopped via KeyboardInterrupt")
-            break
-        except Exception as e:
-            logger.error(f"Polling worker error (attempt {retry_count}): {type(e).__name__}: {e}", exc_info=True)
-            logger.info("Waiting 5 seconds before retry...")
-            time.sleep(5)
-        finally:
-            try:
-                if not loop.is_closed():
-                    loop.close()
-            except:
-                pass
-
-def start_background_polling():
-    """Start the background polling thread."""
-    # Only start if BOT_TOKEN is set
-    if not BOT_TOKEN or BOT_TOKEN == "YOUR_BOT_TOKEN_HERE":
-        logger.error("❌ BOT_TOKEN not set or is placeholder. Background polling disabled!")
-        logger.error("   Please set BOT_TOKEN environment variable in Railway.")
-        return
-    
-    logger.info("✓ BOT_TOKEN is configured, starting polling thread...")
-    thread = threading.Thread(target=polling_worker, daemon=True)
-    thread.start()
-    logger.info("✓ Background polling thread started (daemon)")
-    logger.info("  Bot will now respond to user messages like /start")
-
-# ==================== START POLLING WHEN APP LOADS ====================
-# This runs when the app is imported by gunicorn, not just when run directly
 logger.info("=" * 70)
-logger.info("Flask app initialized. Creating bot application...")
+logger.info("Flask app initialized (webhook mode)")
+logger.info(f"BOT_TOKEN: {bool(BOT_TOKEN and BOT_TOKEN != 'YOUR_BOT_TOKEN_HERE')}")
+logger.info(f"WEBHOOK_URL: {WEBHOOK_URL}")
 logger.info("=" * 70)
-
-# Create the bot app synchronously in the main thread (before background thread)
-# This avoids threading/event loop issues with the Updater
-if BOT_TOKEN and BOT_TOKEN != "YOUR_BOT_TOKEN_HERE":
-    try:
-        logger.info("Creating bot application at module import time...")
-        _bot_app = build_app_sync()
-        logger.info("✓ Bot application created successfully")
-    except Exception as e:
-        logger.error(f"Failed to create bot app: {e}", exc_info=True)
-        _bot_app = None
-else:
-    logger.warning("BOT_TOKEN not configured - bot app will not be created")
-    _bot_app = None
-
-# Start background polling thread
-logger.info("Starting background polling thread...")
-start_background_polling()
+logger.info("Bot receives updates via Telegram webhook (no background polling)")
+logger.info("Users can send /start anytime and bot will respond immediately")
+logger.info("=" * 70)
 
 if __name__ == "__main__":
     port = int(os.getenv("PORT", 5000))
     logger.info(f"Starting Flask server on port {port}")
-    
-    # Start Flask server (blocking)
-    # Note: Polling thread already started above at module import time
+    app.run(host="0.0.0.0", port=port, debug=False)
