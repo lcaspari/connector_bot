@@ -623,9 +623,10 @@ async def handle_new_group_member(update: Update, context: ContextTypes.DEFAULT_
                 )
                 logger.info(f"Bot added to group {GROUP_CHAT_ID}")
 
-async def build_app() -> Application:
+def build_app_sync() -> Application:
     """
-    Build and configure the Telegram bot application.
+    Build and configure the Telegram bot application (synchronous version).
+    Called at module import time to ensure it runs in the main thread.
     Does NOT start the scheduler - that's handled separately by cron jobs.
     """
     init_database()
@@ -644,6 +645,12 @@ async def build_app() -> Application:
     app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, handle_new_group_member))
     
     return app
+
+async def build_app() -> Application:
+    """
+    Async wrapper for build_app_sync (for backward compatibility).
+    """
+    return build_app_sync()
 
 async def run_polling_session(duration_minutes: int = 60):
     """

@@ -14,6 +14,7 @@ from main import (
     send_ask_for_calls,
     send_pair_and_notify,
     run_polling_session,
+    build_app_sync,
     BOT_TOKEN,
     logger as main_logger
 )
@@ -154,15 +155,25 @@ def internal_error(error):
 
 # ==================== BACKGROUND POLLING ====================
 
+# Global app instance - created at module level in main thread
+_bot_app = None
+
 def polling_worker():
     """
     Background worker that runs bot polling continuously.
-    Uses the existing run_polling_session function from main.py.
+    Uses the pre-built app created at module import time.
     """
+    global _bot_app
+    
     logger.info("=" * 70)
     logger.info("Starting background polling worker...")
     logger.info(f"BOT_TOKEN set: {bool(BOT_TOKEN and BOT_TOKEN != 'YOUR_BOT_TOKEN_HERE')}")
+    logger.info(f"App instance available: {_bot_app is not None}")
     logger.info("=" * 70)
+    
+    if _bot_app is None:
+        logger.error("Bot app is not initialized! Cannot start polling.")
+        return
     
     retry_count = 0
     while True:
@@ -170,9 +181,19 @@ def polling_worker():
             retry_count += 1
             logger.info(f"Polling attempt {retry_count}: Starting 24-hour polling session...")
             
-            # Use the existing run_polling_session function (already tested)
-            # Run for 24 hours, then restart
-            asyncio.run(run_polling_session(duration_minutes=1440))
+            # Create event loop for this thread
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            
+            # Initialize and start the app
+            loop.run_until_complete(_bot_app.initialize())
+            loop.run_until_complete(_bot_app.start())
+            
+            # Run polling with timeout
+            logger.info("Bot polling started - listening for user messages")
+            loop.run_until_complete(
+                _bot_app.updater.start_polling(allowed_updates="all", timeout=30)
+            )
             
             logger.info(f"Polling session ended, will restart...")
             
@@ -183,6 +204,12 @@ def polling_worker():
             logger.error(f"Polling worker error (attempt {retry_count}): {type(e).__name__}: {e}", exc_info=True)
             logger.info("Waiting 5 seconds before retry...")
             time.sleep(5)
+        finally:
+            try:
+                if not loop.is_closed():
+                    loop.close()
+            except:
+                pass
 
 def start_background_polling():
     """Start the background polling thread."""
@@ -201,8 +228,22 @@ def start_background_polling():
 # ==================== START POLLING WHEN APP LOADS ====================
 # This runs when the app is imported by gunicorn, not just when run directly
 logger.info("=" * 70)
-logger.info("Flask app initialized. Starting bot polling thread...")
+logger.info("Flask app initialized. Creating bot application...")
 logger.info("=" * 70)
+
+# Create the bot app synchronously in the main thread (before background thread)
+# This avoids threading/event loop issues with the Updater
+if BOT_TOKEN and BOT_TOKEN != "YOUR_BOT_TOKEN_HERE":
+    try:
+        logger.info("Creating bot application at module import time...")
+        _bot_app = build_app_sync()
+        logger.info("✓ Bot application created successfully")
+    except Exception as e:
+        logger.error(f"Failed to create bot app: {e}", exc_info=True)
+        _bot_app = None
+else:
+    logger.warning("BOT_TOKEN not configured - bot app will not be created")
+    _bot_app = None
 
 # Start background polling thread
 logger.info("Starting background polling thread...")
