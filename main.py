@@ -659,19 +659,22 @@ async def process_telegram_update(update_data: dict, app=None) -> bool:
         True if processed successfully, False otherwise
     """
     try:
-        # Convert dict to Update object
-        update = Update.de_json(update_data, None)
+        # Create Bot instance and associate with Update
+        from telegram import Bot
+        bot = Bot(token=BOT_TOKEN)
+        
+        # Convert dict to Update object WITH bot association
+        update = Update.de_json(update_data, bot)
         if not update:
             logger.warning("Failed to deserialize update")
             return False
         
-        # Create a minimal context-like object with just the bot
+        # Create a minimal context-like object with the bot
         class FakeContext:
-            def __init__(self):
-                from telegram import Bot
-                self.bot = Bot(token=BOT_TOKEN)
+            def __init__(self, bot_instance):
+                self.bot = bot_instance
         
-        context = FakeContext()
+        context = FakeContext(bot)
         
         # Handle different update types directly
         if update.message and update.message.text:
