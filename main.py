@@ -646,19 +646,21 @@ def build_app_sync() -> Application:
     
     return app
 
-async def process_telegram_update(update_data: dict) -> bool:
+async def process_telegram_update(update_data: dict, app=None) -> bool:
     """
     Process a single Telegram update from webhook.
     
     Args:
         update_data: Raw update dict from Telegram
+        app: Pre-built Application instance (to avoid __slots__ errors)
     
     Returns:
         True if processed successfully, False otherwise
     """
     try:
-        # Create temporary app just for processing this update
-        app = build_app_sync()
+        # Use provided app, or create one if not provided
+        if app is None:
+            app = build_app_sync()
         
         # Convert dict to Update object
         update = Update.de_json(update_data, None)

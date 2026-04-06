@@ -19,6 +19,7 @@ from main import (
     send_ask_for_calls,
     send_pair_and_notify,
     process_telegram_update,
+    build_app_sync,
     BOT_TOKEN,
 )
 from telegram import Bot
@@ -35,6 +36,17 @@ logger = logging.getLogger(__name__)
 app = Flask(__name__)
 CRON_SECRET = os.getenv("CRON_SECRET", "your-secret-here")
 WEBHOOK_URL = os.getenv("WEBHOOK_URL", "https://web-production-9b103.up.railway.app/telegram")
+
+# Create the bot application once at server startup (avoids __slots__ errors)
+# This is reused for all webhook updates
+bot_app = None
+if BOT_TOKEN and BOT_TOKEN != "YOUR_BOT_TOKEN_HERE":
+    try:
+        logger.info("Creating bot application at server startup...")
+        bot_app = build_app_sync()
+        logger.info("✓ Bot application created successfully")
+    except Exception as e:
+        logger.error(f"Failed to create bot application: {e}", exc_info=True)
 
 # ==================== HEALTH CHECK ====================
 
@@ -63,8 +75,12 @@ def telegram_webhook():
         update_id = update_data.get("update_id", "unknown")
         logger.info(f"Received telegram update {update_id}")
         
-        # Process the update (call async function synchronously)
-        success = asyncio.run(process_telegram_update(update_data))
+        # Process the update using the pre-built app
+        if bot_app is None:
+            logger.error("Bot application not initialized")
+            return jsonify({"ok": True}), 200
+        
+        success = asyncio.run(process_telegram_update(update_data, bot_app))
         
         # Always return 200 OK to Telegram (even if we failed to process)
         # Telegram won't retry if we return 200
