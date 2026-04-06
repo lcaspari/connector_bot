@@ -19,6 +19,7 @@ from main import (
     send_ask_for_calls,
     send_pair_and_notify,
     process_telegram_update,
+    init_database,
     BOT_TOKEN,
 )
 from telegram import Bot
@@ -35,6 +36,11 @@ logger = logging.getLogger(__name__)
 app = Flask(__name__)
 CRON_SECRET = os.getenv("CRON_SECRET", "your-secret-here")
 WEBHOOK_URL = os.getenv("WEBHOOK_URL", "https://web-production-9b103.up.railway.app/telegram")
+
+# Initialize database at startup (creates tables if they don't exist)
+logger.info("Initializing database...")
+init_database()
+logger.info("✓ Database initialized")
 
 # ==================== HEALTH CHECK ====================
 
