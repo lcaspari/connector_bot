@@ -40,13 +40,25 @@ WEBHOOK_URL = os.getenv("WEBHOOK_URL", "https://web-production-9b103.up.railway.
 # Create the bot application once at server startup (avoids __slots__ errors)
 # This is reused for all webhook updates
 bot_app = None
+logger.info(f"BOT_TOKEN check: {bool(BOT_TOKEN and BOT_TOKEN != 'YOUR_BOT_TOKEN_HERE')}")
+
 if BOT_TOKEN and BOT_TOKEN != "YOUR_BOT_TOKEN_HERE":
     try:
+        logger.info("=" * 70)
         logger.info("Creating bot application at server startup...")
+        logger.info("=" * 70)
         bot_app = build_app_sync()
+        logger.info("=" * 70)
         logger.info("✓ Bot application created successfully")
+        logger.info("=" * 70)
     except Exception as e:
-        logger.error(f"Failed to create bot application: {e}", exc_info=True)
+        logger.error("=" * 70)
+        logger.error(f"Failed to create bot application: {type(e).__name__}: {e}")
+        logger.error("=" * 70)
+        logger.error("Full traceback:", exc_info=True)
+        logger.error("=" * 70)
+else:
+    logger.warning("BOT_TOKEN not configured - bot will not work!")
 
 # ==================== HEALTH CHECK ====================
 
@@ -155,6 +167,7 @@ logger.info("=" * 70)
 logger.info("Flask app initialized (webhook mode)")
 logger.info(f"BOT_TOKEN: {bool(BOT_TOKEN and BOT_TOKEN != 'YOUR_BOT_TOKEN_HERE')}")
 logger.info(f"WEBHOOK_URL: {WEBHOOK_URL}")
+logger.info(f"Bot app initialized: {bot_app is not None}")
 logger.info("=" * 70)
 logger.info("Bot receives updates via Telegram webhook (no background polling)")
 logger.info("Users can send /start anytime and bot will respond immediately")
