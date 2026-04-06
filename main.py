@@ -44,20 +44,6 @@ DATABASE = os.getenv("DATABASE", "connector_bot.db")
 # Test mode: allows running jobs anytime, bypasses date restrictions
 TEST_MODE = os.getenv("TEST_MODE", "false").lower() == "true"
 
-# ==================== GLOBAL STATE ====================
-# Initialize database once at startup
-init_database()
-
-# Global app instance - created once, reused for all updates
-_telegram_app = None
-
-def get_telegram_app() -> Application:
-    """Get or create the global Telegram app instance."""
-    global _telegram_app
-    if _telegram_app is None:
-        _telegram_app = build_app_sync()
-    return _telegram_app
-
 # ==================== LOGGING ====================
 
 logging.basicConfig(
@@ -545,6 +531,75 @@ async def handle_response_callback(update: Update, context: ContextTypes.DEFAULT
     
     logger.info(f"User {user_id} ({first_name}) responded '{response}' for {month_year}")
 
+async def pair_and_notify(context: ContextTypes.DEFAULT_TYPE):
+    """
+    Run after response period ends to pair users and send notifications.
+    Should be scheduled ~10 minutes after ask_for_calls.
+    """
+    month_year = datetime.now(TIMEZONE).strftime("%Y-%m")
+    
+    yes_users = get_yes_responses(month_year)
+    
+    if len(yes_users) < 2:
+        if GROUP_CHAT_ID:
+            message = "Not enough people said yes for calls this month. See you next month! 👋"
+            await context.bot.send_message(chat_id=GROUP_CHAT_ID, text=message)
+        logger.info(f"Not enough yes responses for {month_year} (only {len(yes_users)})")
+        return
+    
+    # Randomly shuffle and pair
+    random.shuffle(yes_users)
+    pairs: List[Tuple[int, int]] = []
+    
+    # If odd number, last person won't be paired (and won't know why)
+    for i in range(0, len(yes_users) - 1, 2):
+        caller_id = yes_users[i]
+        receiver_id = yes_users[i + 1]
+        pairs.append((caller_id, receiver_id))
+    
+    # Save pairs to database
+    save_pairs(month_year, pairs)
+    
+    # Send notifications
+    for caller_id, receiver_id in pairs:
+        try:
+            # Get receiver's name
+            conn = sqlite3.connect(DATABASE)
+            c = conn.cursor()
+            c.execute("SELECT first_name FROM users WHERE user_id = ?", (receiver_id,))
+            receiver_data = c.fetchone()
+            conn.close()
+            
+            receiver_name = receiver_data[0] if receiver_data else f"User {receiver_id}"
+            
+            await context.bot.send_message(
+                chat_id=caller_id,
+                text=f"📞 *Your Monthly Call Assignment* 📞\n\n"
+                     f"Please call {receiver_name} now or within the next 10 minutes!\n\n"
+                     f"They're expecting your call. If you can't make it right now, "
+                     f"it's okay - they won't know it was you who was supposed to call. 🤐",
+                parse_mode="Markdown"
+            )
+            logger.info(f"Notified user {caller_id} to call {receiver_id}")
+        except Exception as e:
+            logger.error(f"Failed to notify user {caller_id}: {e}")
+    
+    # Notify group
+    if GROUP_CHAT_ID:
+        paired_count = len(pairs)
+        unpaired_text = ""
+        if len(yes_users) % 2 == 1:
+            unpaired_text = f"\n(One person got a surprise day off this month! 🎁)"
+        
+        await context.bot.send_message(
+            chat_id=GROUP_CHAT_ID,
+            text=f"✅ *Pairs created!* ✅\n\n"
+                 f"{paired_count} pair{'s' if paired_count != 1 else ''} have been assigned. "
+                 f"Those who were selected to call have received their assignments privately. "
+                 f"Good luck! 🍀{unpaired_text}",
+            parse_mode="Markdown"
+        )
+
 async def post_init(application: Application):
     """Set up scheduler after bot starts."""
     # NOTE: For Railway cron jobs, the scheduler is NOT set up here
@@ -559,8 +614,6 @@ async def handle_new_group_member(update: Update, context: ContextTypes.DEFAULT_
         for member in update.message.new_chat_members:
             if member.is_bot and member.username == (await context.bot.get_me()).username:
                 GROUP_CHAT_ID = update.message.chat_id
-                # Persist GROUP_CHAT_ID to environment for restart resilience
-                os.environ["GROUP_CHAT_ID"] = str(GROUP_CHAT_ID)
                 await update.message.reply_text(
                     "👋 Hi everyone! I'm the Call Connector Bot.\n\n"
                     "I'll ask you once a month if you have time for a call, "
@@ -573,9 +626,11 @@ async def handle_new_group_member(update: Update, context: ContextTypes.DEFAULT_
 def build_app_sync() -> Application:
     """
     Build and configure the Telegram bot application (synchronous version).
-    Should only be called once to create a global singleton.
+    Called at module import time to ensure it runs in the main thread.
     Does NOT start the scheduler - that's handled separately by cron jobs.
     """
+    init_database()
+    
     app = Application.builder().token(BOT_TOKEN).build()
     
     # Handlers for private chat (registration)
@@ -591,10 +646,9 @@ def build_app_sync() -> Application:
     
     return app
 
-def process_telegram_update(update_data: dict) -> bool:
+async def process_telegram_update(update_data: dict) -> bool:
     """
     Process a single Telegram update from webhook.
-    Uses the global app singleton to avoid recreating on every update.
     
     Args:
         update_data: Raw update dict from Telegram
@@ -603,8 +657,8 @@ def process_telegram_update(update_data: dict) -> bool:
         True if processed successfully, False otherwise
     """
     try:
-        # Get the global app instance (never recreate!)
-        app = get_telegram_app()
+        # Create temporary app just for processing this update
+        app = build_app_sync()
         
         # Convert dict to Update object
         update = Update.de_json(update_data, None)
@@ -612,19 +666,13 @@ def process_telegram_update(update_data: dict) -> bool:
             logger.warning("Failed to deserialize update")
             return False
         
-        # Process the update through handlers (synchronously)
-        import asyncio
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        loop.run_until_complete(app.process_update(update))
-        loop.close()
-        
+        # Process the update through handlers
+        await app.process_update(update)
         return True
     except Exception as e:
         logger.error(f"Failed to process update: {e}", exc_info=True)
         return False
 
 if __name__ == "__main__":
-    # For local testing only - webhook mode is used in production
-    logger.info("Bot is configured for webhook mode on Railway.")
-    logger.info("For local testing, use: python server.py")
+    import asyncio
+    asyncio.run(run_polling_session())
