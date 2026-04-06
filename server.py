@@ -13,11 +13,13 @@ Telegram sends POSTs to /telegram instead of us polling for updates.
 
 import logging
 import os
+import asyncio
 from flask import Flask, jsonify, request
 from main import (
     send_ask_for_calls,
     send_pair_and_notify,
     process_telegram_update,
+    get_telegram_app,
     BOT_TOKEN,
 )
 from telegram import Bot
@@ -33,7 +35,7 @@ logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 CRON_SECRET = os.getenv("CRON_SECRET", "your-secret-here")
-WEBHOOK_URL = os.getenv("WEBHOOK_URL", "https://your-app.railway.app/telegram")
+WEBHOOK_URL = os.getenv("WEBHOOK_URL", "https://web-production-9b103.up.railway.app/telegram")
 
 # ==================== HEALTH CHECK ====================
 
@@ -45,7 +47,7 @@ def health():
 # ==================== TELEGRAM WEBHOOK ====================
 
 @app.route("/telegram", methods=["POST"])
-async def telegram_webhook():
+def telegram_webhook():
     """
     Receive updates from Telegram via webhook.
     Telegram sends POST requests here when users interact with the bot.
@@ -62,8 +64,8 @@ async def telegram_webhook():
         update_id = update_data.get("update_id", "unknown")
         logger.info(f"Received telegram update {update_id}")
         
-        # Process the update
-        success = await process_telegram_update(update_data)
+        # Process the update (synchronously)
+        success = process_telegram_update(update_data)
         
         # Always return 200 OK to Telegram (even if we failed to process)
         # Telegram won't retry if we return 200
@@ -77,7 +79,7 @@ async def telegram_webhook():
 # ==================== CRON JOB ENDPOINTS ====================
 
 @app.route("/cron/ask", methods=["GET", "POST"])
-async def cron_ask():
+def cron_ask():
     """
     Cron job endpoint: Ask group for participation.
     Called by GitHub Actions on the last Monday of month at 19:00 UTC.
@@ -97,7 +99,11 @@ async def cron_ask():
     
     try:
         bot = Bot(token=BOT_TOKEN)
-        result = await send_ask_for_calls(bot)
+        # Run async function synchronously
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        result = loop.run_until_complete(send_ask_for_calls(bot))
+        loop.close()
         logger.info(f"Cron ask result: {result}")
         return jsonify(result), 200
     except Exception as e:
@@ -105,7 +111,7 @@ async def cron_ask():
         return jsonify({"status": "error", "message": str(e)}), 500
 
 @app.route("/cron/pair", methods=["GET", "POST"])
-async def cron_pair():
+def cron_pair():
     """
     Cron job endpoint: Pair users and send notifications.
     Called by GitHub Actions on the last Monday of month at 19:10 UTC (10 min after ask).
@@ -125,12 +131,64 @@ async def cron_pair():
     
     try:
         bot = Bot(token=BOT_TOKEN)
-        result = await send_pair_and_notify(bot)
+        # Run async function synchronously
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        result = loop.run_until_complete(send_pair_and_notify(bot))
+        loop.close()
         logger.info(f"Cron pair result: {result}")
         return jsonify(result), 200
     except Exception as e:
         logger.error(f"Cron pair error: {e}", exc_info=True)
         return jsonify({"status": "error", "message": str(e)}), 500
+
+# ==================== WEBHOOK MANAGEMENT ====================
+
+@app.route("/webhook/register", methods=["POST"])
+def register_webhook():
+    """
+    Register the webhook URL with Telegram.
+    Call this endpoint to set up webhook after deploying.
+    
+    Usage: POST /webhook/register?secret=YOUR_CRON_SECRET
+    """
+    # Validate secret
+    secret = request.args.get("secret")
+    if secret != CRON_SECRET:
+        logger.warning("Unauthorized webhook registration attempt")
+        return jsonify({"error": "Unauthorized"}), 401
+    
+    try:
+        from telegram import TelegramError
+        bot = Bot(token=BOT_TOKEN)
+        
+        # Register the webhook
+        result = bot.set_webhook(url=WEBHOOK_URL)
+        
+        if result:
+            logger.info(f"✓ Webhook registered: {WEBHOOK_URL}")
+            return jsonify({
+                "status": "success",
+                "message": f"Webhook registered: {WEBHOOK_URL}"
+            }), 200
+        else:
+            logger.error("Failed to register webhook")
+            return jsonify({
+                "status": "error",
+                "message": "Failed to register webhook with Telegram"
+            }), 500
+    except TelegramError as e:
+        logger.error(f"Telegram error registering webhook: {e}")
+        return jsonify({
+            "status": "error",
+            "message": f"Telegram error: {str(e)}"
+        }), 500
+    except Exception as e:
+        logger.error(f"Error registering webhook: {e}")
+        return jsonify({
+            "status": "error",
+            "message": str(e)
+        }), 500
 
 # ==================== STARTUP ====================
 
@@ -139,9 +197,19 @@ logger.info("Flask app initialized (webhook mode)")
 logger.info(f"BOT_TOKEN: {bool(BOT_TOKEN and BOT_TOKEN != 'YOUR_BOT_TOKEN_HERE')}")
 logger.info(f"WEBHOOK_URL: {WEBHOOK_URL}")
 logger.info("=" * 70)
-logger.info("Bot receives updates via Telegram webhook (no background polling)")
-logger.info("Users can send /start anytime and bot will respond immediately")
+logger.info("✓ Global Telegram app instance created")
+logger.info("✓ Database initialized")
 logger.info("=" * 70)
+logger.info("Bot receives updates via Telegram webhook (no background polling)")
+logger.info("To register webhook, run: curl http://localhost:5000/webhook/register?secret=YOUR_SECRET")
+logger.info("=" * 70)
+
+# Pre-initialize the global app instance to catch any startup errors
+try:
+    _ = get_telegram_app()
+    logger.info("✓ Bot application ready")
+except Exception as e:
+    logger.error(f"Failed to initialize bot app: {e}", exc_info=True)
 
 if __name__ == "__main__":
     port = int(os.getenv("PORT", 5000))
