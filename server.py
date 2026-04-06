@@ -19,7 +19,6 @@ from main import (
     send_ask_for_calls,
     send_pair_and_notify,
     process_telegram_update,
-    build_app_sync,
     BOT_TOKEN,
 )
 from telegram import Bot
@@ -37,29 +36,6 @@ app = Flask(__name__)
 CRON_SECRET = os.getenv("CRON_SECRET", "your-secret-here")
 WEBHOOK_URL = os.getenv("WEBHOOK_URL", "https://web-production-9b103.up.railway.app/telegram")
 
-# Create the bot application once at server startup (avoids __slots__ errors)
-# This is reused for all webhook updates
-bot_app = None
-logger.info(f"BOT_TOKEN check: {bool(BOT_TOKEN and BOT_TOKEN != 'YOUR_BOT_TOKEN_HERE')}")
-
-if BOT_TOKEN and BOT_TOKEN != "YOUR_BOT_TOKEN_HERE":
-    try:
-        logger.info("=" * 70)
-        logger.info("Creating bot application at server startup...")
-        logger.info("=" * 70)
-        bot_app = build_app_sync()
-        logger.info("=" * 70)
-        logger.info("✓ Bot application created successfully")
-        logger.info("=" * 70)
-    except Exception as e:
-        logger.error("=" * 70)
-        logger.error(f"Failed to create bot application: {type(e).__name__}: {e}")
-        logger.error("=" * 70)
-        logger.error("Full traceback:", exc_info=True)
-        logger.error("=" * 70)
-else:
-    logger.warning("BOT_TOKEN not configured - bot will not work!")
-
 # ==================== HEALTH CHECK ====================
 
 @app.route("/health", methods=["GET"])
@@ -74,7 +50,7 @@ def telegram_webhook():
     """
     Receive updates from Telegram via webhook.
     Telegram sends POST requests here when users interact with the bot.
-    This replaces polling - much more efficient!
+    Handlers are called directly to avoid Updater __slots__ issues.
     """
     try:
         # Get the update from Telegram
@@ -87,14 +63,10 @@ def telegram_webhook():
         update_id = update_data.get("update_id", "unknown")
         logger.info(f"Received telegram update {update_id}")
         
-        # Process the update using the pre-built app
-        if bot_app is None:
-            logger.error("Bot application not initialized")
-            return jsonify({"ok": True}), 200
+        # Process the update directly (no Application needed)
+        success = asyncio.run(process_telegram_update(update_data))
         
-        success = asyncio.run(process_telegram_update(update_data, bot_app))
-        
-        # Always return 200 OK to Telegram (even if we failed to process)
+        # Always return 200 OK to Telegram
         # Telegram won't retry if we return 200
         return jsonify({"ok": True}), 200
             
@@ -164,12 +136,12 @@ def cron_pair():
 # ==================== STARTUP ====================
 
 logger.info("=" * 70)
-logger.info("Flask app initialized (webhook mode)")
+logger.info("Flask app initialized (webhook mode - direct handler approach)")
 logger.info(f"BOT_TOKEN: {bool(BOT_TOKEN and BOT_TOKEN != 'YOUR_BOT_TOKEN_HERE')}")
 logger.info(f"WEBHOOK_URL: {WEBHOOK_URL}")
-logger.info(f"Bot app initialized: {bot_app is not None}")
 logger.info("=" * 70)
-logger.info("Bot receives updates via Telegram webhook (no background polling)")
+logger.info("Bot receives updates via Telegram webhook")
+logger.info("Handlers called directly (no Application/Updater needed)")
 logger.info("Users can send /start anytime and bot will respond immediately")
 logger.info("=" * 70)
 

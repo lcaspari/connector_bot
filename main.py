@@ -648,31 +648,72 @@ def build_app_sync() -> Application:
 
 async def process_telegram_update(update_data: dict, app=None) -> bool:
     """
-    Process a single Telegram update from webhook.
+    Process a single Telegram update from webhook WITHOUT using Application.
+    Calls handlers directly to avoid Updater __slots__ issues.
     
     Args:
         update_data: Raw update dict from Telegram
-        app: Pre-built Application instance (to avoid __slots__ errors)
+        app: Unused (kept for compatibility), not needed with direct handler approach
     
     Returns:
         True if processed successfully, False otherwise
     """
     try:
-        # Use provided app, or create one if not provided
-        if app is None:
-            app = build_app_sync()
-        
         # Convert dict to Update object
         update = Update.de_json(update_data, None)
         if not update:
             logger.warning("Failed to deserialize update")
             return False
         
-        # Process the update through handlers
-        await app.process_update(update)
+        # Create a minimal context-like object with just the bot
+        class FakeContext:
+            def __init__(self):
+                from telegram import Bot
+                self.bot = Bot(token=BOT_TOKEN)
+        
+        context = FakeContext()
+        
+        # Handle different update types directly
+        if update.message and update.message.text:
+            text = update.message.text
+            user_id = update.message.from_user.id
+            first_name = update.message.from_user.first_name
+            username = update.message.from_user.username
+            
+            logger.info(f"Message from {user_id} ({first_name}): {text}")
+            
+            # Handle commands
+            if text == "/start":
+                await start(update, context)
+            elif text == "/help":
+                await help_command(update, context)
+            elif text == "/status":
+                await status_command(update, context)
+            else:
+                # Unknown command
+                await update.message.reply_text("Unknown command. Type /help for available commands.")
+        
+        # Handle button callbacks (query updates)
+        elif update.callback_query:
+            query = update.callback_query
+            logger.info(f"Callback from {query.from_user.id}: {query.data}")
+            
+            if query.data == "register_yes":
+                await register_callback(update, context)
+            elif query.data.startswith("response_"):
+                await handle_response_callback(update, context)
+            else:
+                await query.answer("Unknown action", show_alert=True)
+        
+        # Handle when bot joins group
+        elif update.message and update.message.new_chat_members:
+            await handle_new_group_member(update, context)
+        
+        logger.info(f"Update {update.update_id} processed successfully")
         return True
+        
     except Exception as e:
-        logger.error(f"Failed to process update: {e}", exc_info=True)
+        logger.error(f"Failed to process update: {type(e).__name__}: {e}", exc_info=True)
         return False
 
 if __name__ == "__main__":
