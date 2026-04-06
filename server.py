@@ -11,14 +11,13 @@ import threading
 import time
 from flask import Flask, jsonify, request
 from main import (
-    build_app,
     send_ask_for_calls,
     send_pair_and_notify,
     run_polling_session,
     BOT_TOKEN,
     logger as main_logger
 )
-from telegram import Bot, Update
+from telegram import Bot
 
 # Configure logging
 logging.basicConfig(
@@ -155,50 +154,35 @@ def internal_error(error):
 
 # ==================== BACKGROUND POLLING ====================
 
-async def run_bot_polling():
-    """
-    Run bot polling using Application.run_polling().
-    This lets the library manage the event loop properly.
-    """
-    logger.info("Building Telegram bot application...")
-    app = await build_app()
-    logger.info("✓ Bot application built successfully")
-    
-    logger.info("Starting bot with polling...")
-    # run_polling() manages the event loop internally
-    await app.run_polling(allowed_updates=Update.ALL_TYPES, timeout=30)
-
 def polling_worker():
     """
-    Background worker that continuously polls for Telegram updates.
-    This allows the bot to respond to user messages like /start.
-    
-    Runs indefinitely in its own event loop.
+    Background worker that runs bot polling continuously.
+    Uses the existing run_polling_session function from main.py.
     """
     logger.info("=" * 70)
     logger.info("Starting background polling worker...")
     logger.info(f"BOT_TOKEN set: {bool(BOT_TOKEN and BOT_TOKEN != 'YOUR_BOT_TOKEN_HERE')}")
     logger.info("=" * 70)
     
-    try:
-        # Create a fresh event loop for this thread
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        
-        # Let Application.run_polling() manage the polling
-        loop.run_until_complete(run_bot_polling())
-        
-    except KeyboardInterrupt:
-        logger.info("Polling worker stopped via KeyboardInterrupt")
-    except Exception as e:
-        logger.error(f"Fatal polling error: {type(e).__name__}: {e}", exc_info=True)
-    finally:
-        logger.info("Closing event loop...")
+    retry_count = 0
+    while True:
         try:
-            loop.close()
-        except:
-            pass
-        logger.info("Polling worker thread ended")
+            retry_count += 1
+            logger.info(f"Polling attempt {retry_count}: Starting 24-hour polling session...")
+            
+            # Use the existing run_polling_session function (already tested)
+            # Run for 24 hours, then restart
+            asyncio.run(run_polling_session(duration_minutes=1440))
+            
+            logger.info(f"Polling session ended, will restart...")
+            
+        except KeyboardInterrupt:
+            logger.info("Polling worker stopped via KeyboardInterrupt")
+            break
+        except Exception as e:
+            logger.error(f"Polling worker error (attempt {retry_count}): {type(e).__name__}: {e}", exc_info=True)
+            logger.info("Waiting 5 seconds before retry...")
+            time.sleep(5)
 
 def start_background_polling():
     """Start the background polling thread."""
@@ -217,8 +201,11 @@ def start_background_polling():
 # ==================== START POLLING WHEN APP LOADS ====================
 # This runs when the app is imported by gunicorn, not just when run directly
 logger.info("=" * 70)
-logger.info("Flask app initialized. Starting background polling thread...")
+logger.info("Flask app initialized. Starting bot polling thread...")
 logger.info("=" * 70)
+
+# Start background polling thread
+logger.info("Starting background polling thread...")
 start_background_polling()
 
 if __name__ == "__main__":
