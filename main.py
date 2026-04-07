@@ -244,7 +244,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     if is_registered:
         await update.message.reply_text(
-            f"Welcome back, {first_name}! You're already registered with the Call Bot."
+            f"Welcome back, {first_name}! You're already registered with me - Avaloki, the call connector bot."
         )
     else:
         keyboard = [
@@ -281,17 +281,15 @@ async def register_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Show help information."""
     await update.message.reply_text(
-        "*Connector Bot Help*\n\n"
-        "*Commands:*\n"
-        "/start - Register with the bot\n"
-        "/help - Show this help message\n"
-        "/status - Check your registration status\n\n"
-        "*How it works:*\n"
+        "Hey, these are so far the only latin words I understand:\n\n"
+        "/start - register and I will put you on my mailing list\n"
+        "/help - well ...\n"
+        "/status - check if I have put you on my list\n\n"
+        "And this is what I can do:\n"
         "1. I'll ask the group monthly if people have time for a call\n"
         "2. You respond with Yes or No\n"
         "3. If you say yes, you might get paired with someone\n"
-        "4. I'll message you privately who to call\n"
-        "5. If you don't call, it's your secret - no one will know!",
+        "4. I'll message you privately who to call\n",
         parse_mode="Markdown"
     )
 
@@ -301,7 +299,7 @@ async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     is_registered = is_user_registered(user_id)
     
     if is_registered:
-        await update.message.reply_text("You are registered with the Call Bot!")
+        await update.message.reply_text("You are registered with Avaloki, the call connector bot!")
     else:
         await update.message.reply_text(
             "You are not registered. Use /start to register."
@@ -356,7 +354,7 @@ async def send_ask_for_calls(bot):
                  "Do you have time for a call in about an hour? :)"
                  "Let me know below!\n\n"
                  "_Important: To receive your private pairing assignment, "
-                 "start a chat with me by sending /start in private messages!_",
+                 "start a chat with me by sending /start as a private message to me!_",
             reply_markup=reply_markup,
             parse_mode="Markdown"
         )
@@ -398,7 +396,7 @@ async def send_pair_and_notify(bot):
     yes_users = get_yes_responses(month_year)
     
     if len(yes_users) < 2:
-        msg = "Not enough people said yes for calls this month. See you next month!"
+        msg = "Hey, not enough people said yes for calls this month. That's fine, it means you are having a nice time (hopefully!) :). \nSee you next month! Avaloki"
         if GROUP_CHAT_ID:
             try:
                 await bot.send_message(chat_id=GROUP_CHAT_ID, text=msg)
@@ -437,7 +435,8 @@ async def send_pair_and_notify(bot):
                 text=f"Hello!\n\n"
                      f"Please call <a href=\"tg://user?id={receiver_id}\">{receiver_name}</a> now :)\n\n"
                      f"They're expecting a call, but if you can't make it right now, "
-                     f"it's completely fine :) they won't know it was you who was supposed to call.",
+                     f"it's completely fine :) they won't know it was you who was supposed to call. \n"
+                     f"Have a nice time, \nAvaloki",
                 parse_mode="HTML"
             )
             notification_count += 1
@@ -462,11 +461,11 @@ async def send_pair_and_notify(bot):
         try:
             await bot.send_message(
                 chat_id=GROUP_CHAT_ID,
-                text=f"*Pairs created!*\n\n"
-                     f"{paired_count} pair{'s' if paired_count != 1 else ''} have been assigned. "
-                     f"Those selected to call have received their assignments privately. "
-                     f"Please be reminded that maybe not everyone was assigned, so one person might not get a call."
-                     f"Good luck! {failed_text}",
+                text=f"Hey, I created the pairs! "
+                     f"{paired_count} pair{'s' if paired_count != 1 else ''} have been assigned. :) \n"
+                     f"Those selected to call have received their assignments privately. \n\n"
+                     f"Please be reminded that maybe not everyone was assigned, so one person might not get a call. \n"
+                     f"Good luck!",
                 parse_mode="Markdown"
             )
         except Exception as e:
@@ -488,7 +487,7 @@ async def handle_response_callback(update: Update, context: ContextTypes.DEFAULT
     
     # Check if registered
     if not is_user_registered(user_id):
-        await query.answer("You must register first. Use /start in private chat.", show_alert=True)
+        await query.answer("You must register first. Use /start in private chat with me.", show_alert=True)
         return
     
     # Extract response and month_year from callback data
@@ -512,12 +511,13 @@ async def handle_new_group_member(update: Update, context: ContextTypes.DEFAULT_
             if member.is_bot and member.username == (await context.bot.get_me()).username:
                 GROUP_CHAT_ID = update.message.chat_id
                 await update.message.reply_text(
-                    "Hi! I'm Avalokiteshvara \n\n"
-                    "but lowkey - people just call me Avaloki, the call connector Bot ;)\n\n"
+                    "Hi everyone! I'm Avalokiteshvara, \n"
+                    "but lowkey - people just call me Avaloki, the call connector bot ;)\n\n"
                     "I'll ask you once a month if you have time for a call, "
-                    "and I'll randomly pair you with someone else to chat. "
-                    "but no pressure - if you don't call, it stays between us hihi :)\n\n"
-                    "Use /start in private chat to register with me."
+                    "and I'll randomly pair you with someone else. "
+                    "but no pressure - if you don't call, it stays between us hihi\n\n"
+                    "Please write /start in my private chat to register with me. :)\n\n"
+                    "Happy to be here! \n- Avaloki"
                 )
                 logger.info(f"Bot added to group {GROUP_CHAT_ID}")
 
@@ -569,7 +569,7 @@ async def process_telegram_update(update_data: dict, app=None) -> bool:
                 await status_command(update, context)
             else:
                 # Unknown command
-                await update.message.reply_text("Hey sorry, usually people from a far different cultural region commmunicate with me, so my knowledge of latin languages is still limited. Type /help for available vocabulary.")
+                await update.message.reply_text("Hey sorry, usually people from a far different cultural region commmunicate with me. \nMy knowledge of latin languages is still limited. \nType /help for available vocabulary.")
         
         # Handle button callbacks (query updates)
         elif update.callback_query:
