@@ -1,16 +1,16 @@
 name: Connector Bot Cron Jobs
 
-# Trigger on every Monday at 19:00 UTC
+# Trigger daily at 16:00 UTC (18:00 Berlin time with DST)
 on:
   schedule:
-    # Every Monday at 19:00 UTC (0 19 * * 1)
-    - cron: '0 19 * * 1'
+    # Every day at 16:00 UTC (roughly 18:00 Europe/Berlin depending on DST)
+    - cron: '0 16 * * *'
   # Allow manual trigger for testing
   workflow_dispatch:
 
 jobs:
   ask-for-calls:
-    name: Ask for Calls (Last Monday Check)
+    name: Ask for Calls (Full Moon Check)
     runs-on: ubuntu-latest
     steps:
       - name: Trigger /cron/ask endpoint
@@ -22,7 +22,7 @@ jobs:
         run: echo "Failed to trigger ask_for_calls. Check RAILWAY_URL and CRON_SECRET."
 
   pair-and-notify:
-    name: Pair & Notify (Last Monday Check)
+    name: Pair & Notify (Full Moon Check)
     runs-on: ubuntu-latest
     needs: ask-for-calls
     steps:

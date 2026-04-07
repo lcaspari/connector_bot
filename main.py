@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""
-Telegram Bot for Monthly Group Call Scheduling
+"""                                                                         
+Telegram Bot for Full Moon Group Call Scheduling
 Deployed on Railway.app with GitHub Actions cron jobs
 
 Architecture:
 - Flask Web Server: Runs 24/7 to handle HTTP requests and user interactions
-- GitHub Actions Cron Jobs (Every Monday):
-  * 18:00 Europe/Berlin: ask_for_calls - Asks group if they have time
+- GitHub Actions Cron Jobs (Daily):
+  * 18:00 Europe/Berlin: ask_for_calls - Checks if full moon, asks group if they have time
   * 19:00 Europe/Berlin: pair_and_notify - Creates pairs and notifies callers (1 hour later)
 - User Registration: On-demand via /start command (anytime)
 - Database: SQLite for storing users, responses, and job execution history
@@ -19,6 +19,7 @@ import os
 from datetime import datetime, timedelta
 from typing import Optional, List, Tuple
 import pytz
+import ephem
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 
@@ -47,22 +48,36 @@ logger = logging.getLogger(__name__)
 
 # ==================== HELPERS ====================
 
-def is_last_monday_of_month() -> bool:
+def is_full_moon_today() -> bool:
     """
-    Check if today is the last Monday of the current month.
+    Check if today is a full moon day in the configured timezone.
     
     Returns:
-        True if today is the last Monday of the month, False otherwise
+        True if today is a full moon day, False otherwise
     """
-    today = datetime.now(TIMEZONE).date()
+    now = datetime.now(TIMEZONE)
+    today_date = now.date()
     
-    # Check if today is a Monday (weekday 0 = Monday)
-    if today.weekday() != 0:
+    try:
+        # Find the next full moon from the current time
+        next_full_moon = ephem.next_full_moon(now)
+        next_fm_dt = ephem.Date(next_full_moon).datetime(tzinfo=TIMEZONE)
+        
+        # Check if the next full moon occurs on today's date
+        if next_fm_dt.date() == today_date:
+            return True
+        
+        # Also check the previous full moon in case we're past it today
+        prev_full_moon = ephem.previous_full_moon(now)
+        prev_fm_dt = ephem.Date(prev_full_moon).datetime(tzinfo=TIMEZONE)
+        
+        if prev_fm_dt.date() == today_date:
+            return True
+        
         return False
-    
-    # Check if there's another Monday in this month
-    next_week = today + timedelta(days=7)
-    return next_week.month != today.month
+    except Exception as e:
+        logger.error(f"Error checking full moon: {e}")
+        return False
 
 # ==================== DATABASE ====================
 
@@ -310,8 +325,8 @@ async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def send_ask_for_calls(bot):
     """
     CRON JOB 1: Called to ask group for participation.
-    Only executes on the last Monday of the month.
-    Run this via HTTP endpoint from Railway's cron scheduler (weekly on Mondays).
+    Only executes on full moon day.
+    Run this via HTTP endpoint from Railway's cron scheduler (daily).
     
     Args:
         bot: Telegram Bot instance
@@ -319,11 +334,11 @@ async def send_ask_for_calls(bot):
     Returns:
         Dict with status and message
     """
-    # Check if today is the last Monday of the month (skip if TEST_MODE enabled)
-    if not TEST_MODE and not is_last_monday_of_month():
+    # Check if today is a full moon day (skip if TEST_MODE enabled)
+    if not TEST_MODE and not is_full_moon_today():
         return {
             "status": "skipped",
-            "message": "Not the last Monday of the month. No action taken."
+            "message": "Not a full moon day. No action taken."
         }
     
     # Check if already executed this month (skip if TEST_MODE enabled)
@@ -368,8 +383,8 @@ async def send_ask_for_calls(bot):
 async def send_pair_and_notify(bot):
     """
     CRON JOB 2: Called to pair users and send notifications.
-    Only executes on the last Monday of the month (after ask_for_calls).
-    Run this via HTTP endpoint from Railway's cron scheduler (weekly on Mondays).
+    Only executes on full moon day (after ask_for_calls).
+    Run this via HTTP endpoint from Railway's cron scheduler (daily).
     
     Args:
         bot: Telegram Bot instance
@@ -377,11 +392,11 @@ async def send_pair_and_notify(bot):
     Returns:
         Dict with status and results
     """
-    # Check if today is the last Monday of the month (skip if TEST_MODE enabled)
-    if not TEST_MODE and not is_last_monday_of_month():
+    # Check if today is a full moon day (skip if TEST_MODE enabled)
+    if not TEST_MODE and not is_full_moon_today():
         return {
             "status": "skipped",
-            "message": "Not the last Monday of the month. No action taken."
+            "message": "Not a full moon day. No action taken."
         }
     
     # Check if already executed this month (skip if TEST_MODE enabled)
