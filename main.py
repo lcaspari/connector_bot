@@ -112,17 +112,6 @@ def init_database():
         )
     """)
     
-    # Cron execution tracking table (deprecated - full moon check is sufficient)
-    # c.execute("""
-    #     CREATE TABLE IF NOT EXISTS cron_executions (
-    #         id INTEGER PRIMARY KEY AUTOINCREMENT,
-    #         job_name TEXT NOT NULL,
-    #         month_year TEXT NOT NULL,
-    #         executed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    #         UNIQUE(job_name, month_year)
-    #     )
-    # """)
-    
     conn.commit()
     conn.close()
 
@@ -220,12 +209,6 @@ def get_paired_users(month_year: str) -> List[Tuple[int, int]]:
     conn.close()
     return pairs
 
-def job_already_executed_today(job_name: str) -> bool:
-    """Check if a cron job was already executed today (deprecated - use full moon check instead)."""
-    # This function is deprecated and no longer used.
-    # The full moon check is sufficient to prevent duplicate executions.
-    return False
-
 # ==================== BOT EVENT HANDLERS ====================
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -293,7 +276,7 @@ async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     is_registered = is_user_registered(user_id)
     
     if is_registered:
-        await update.message.reply_text("You are registered with Avaloki, the call connector bot!")
+        await update.message.reply_text("You are registered with Avaloki, the call connector bot.")
     else:
         await update.message.reply_text(
             "You are not registered. Use /start to register."
