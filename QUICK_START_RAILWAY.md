@@ -18,7 +18,7 @@ Get your bot running on Railway.app in 5 minutes!
 
 In Railway dashboard → Variables tab:
 
-⚠️ **IMPORTANT: Mark `BOT_TOKEN` and `CRON_SECRET` as secrets (click the lock icon!)**
+IMPORTANT: Mark `BOT_TOKEN` and `CRON_SECRET` as secrets (click the lock icon!)
 
 ```
 BOT_TOKEN=<your-actual-token-from-BotFather>
@@ -29,7 +29,7 @@ TIMEZONE=Europe/Berlin
 GROUP_CHAT_ID=<leave-blank-for-now>
 ```
 
-📅 **Smart Scheduling**: Bot automatically detects the **last Monday of each month** - no need to set a fixed date!
+Smart Scheduling: Bot automatically detects the **last Monday of each month** - no need to set a fixed date!
 
 **How to generate a secure `CRON_SECRET`:**
 ```bash
@@ -38,7 +38,7 @@ python -c "import secrets; print(secrets.token_hex(32))"
 
 **How to mark as secret in Railway:**
 1. Paste the value in the variable field
-2. Click the **lock icon 🔒** next to the variable name
+2. Click the **lock icon** next to the variable name
 3. It's now encrypted and hidden from logs
 
 ### 3. Wait for Deployment
@@ -70,9 +70,9 @@ The easiest way is **GitHub Actions** - it's already set up in your repo!
    - Secret value: Your `CRON_SECRET` from Railway variables
 
 4. **That's it!** The workflow at `.github/workflows/cron-jobs.yml` will:
-   - ✅ Run every Monday at 19:00 UTC automatically
-   - ✅ Call `/cron/ask` to ask the group
-   - ✅ Wait 10 minutes, then call `/cron/pair` to create pairs
+   - Run every Monday at 19:00 UTC automatically
+   - Call `/cron/ask` to ask the group
+   - Wait 10 minutes, then call `/cron/pair` to create pairs
 
 5. **Want to test?**
    - Go to Actions tab → Connector Bot Cron Jobs
@@ -98,7 +98,7 @@ You can delete `.github/workflows/daily-polling.yml` since registrations happen 
 
 **Registration**: Users message `/start` to the bot privately anytime - no polling needed!
 
-✅ Done! Bot is now running 24/7 for ~$0.50/month
+Done! Bot is now running 24/7 for ~$0.50/month
 
 ## Verify It Works
 

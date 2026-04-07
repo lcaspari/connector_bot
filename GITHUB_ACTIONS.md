@@ -4,11 +4,11 @@ Use GitHub Actions to automatically trigger your bot's cron jobs. No external se
 
 ## Why GitHub Actions?
 
-✅ **Built-in** - No sign-ups or external services  
-✅ **Free** - Includes thousands of free minutes per month  
-✅ **Reliable** - GitHub manages infrastructure  
-✅ **Easy** - Simple secret management  
-✅ **Visible** - See all runs in your Actions tab  
+**Built-in** - No sign-ups or external services
+**Free** - Includes thousands of free minutes per month
+**Reliable** - GitHub manages infrastructure
+**Easy** - Simple secret management
+**Visible** - See all runs in your Actions tab  
 
 ## Setup (2 minutes)
 
@@ -96,20 +96,20 @@ Examples:
 ### Check a Specific Run
 
 1. Click on "Connector Bot Cron Jobs"
-2. See all past runs with status (✅ or ❌)
+2. See all past runs with status (pass or fail)
 3. Click a run to see detailed logs
 4. With failures, includes curl output and error messages
 
 ### Example Successful Run
 
 ```
-✅ ask-for-calls      - Posted /cron/ask (Monday 19:00 UTC)
-✅ pair-and-notify    - Waited 10 min, posted /cron/pair (Monday 19:10 UTC)
+ask-for-calls      - Posted /cron/ask (Monday 19:00 UTC)
+pair-and-notify    - Waited 10 min, posted /cron/pair (Monday 19:10 UTC)
 ```
 
 ### Troubleshooting a Failed Run
 
-Click red ❌ run to see logs. Common issues:
+Click red (failed) run to see logs. Common issues:
 
 **401 Unauthorized**
 - Check `CRON_SECRET` matches Railway variable
@@ -149,10 +149,10 @@ Want to test immediately without waiting for Monday?
 ### What TEST_MODE Does
 
 When `TEST_MODE = true`:
-- ✅ Runs the job regardless of the day/date
-- ✅ Bypasses the "last Monday" check
-- ✅ Allows multiple runs in the same month (for testing)
-- ✅ Useful for development and testing before production
+- Runs the job regardless of the day/date
+- Bypasses the "last Monday" check
+- Allows multiple runs in the same month (for testing)
+- Useful for development and testing before production
 
 **Remember:** Set `TEST_MODE = false` after testing!
 
@@ -205,7 +205,7 @@ GitHub Actions free tier includes:
 Your bot uses ~2 minutes per month:
 - Every Monday: 1 min (ask) + 10 min wait + 1 min (pair) = ~12 min/month
 
-**Monthly usage**: ~12 minutes / 2,000 free = ✅ Free!
+**Monthly usage**: ~12 minutes / 2,000 free = Free!
 
 ## FAQ
 

@@ -100,11 +100,11 @@ This removes the webhook and falls back to polling (not recommended).
 
 ### Benefits of Webhooks
 
-✅ **No background polling loops** - More efficient  
-✅ **No threading issues** - Avoids Python 3.13 __slots__ problems  
-✅ **Immediate updates** - Telegram sends updates directly  
-✅ **Production standard** - Best practice for Telegram bots  
-✅ **Lower resource usage** - No polling means less CPU/bandwidth  
+**No background polling loops** - More efficient
+**No threading issues** - Avoids Python 3.13 __slots__ problems
+**Immediate updates** - Telegram sends updates directly
+**Production standard** - Best practice for Telegram bots
+**Lower resource usage** - No polling means less CPU/bandwidth  
 
 ### Cron Jobs Still Work
 

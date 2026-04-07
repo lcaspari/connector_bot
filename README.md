@@ -1,4 +1,4 @@
-# Monthly Call Connector Bot 🎤
+# Monthly Call Connector Bot
 
 A Telegram bot that organizes monthly call connections between group members with privacy protection.
 
@@ -18,18 +18,18 @@ See [TELEGRAM_WEBHOOK_SETUP.md](TELEGRAM_WEBHOOK_SETUP.md) for webhook configura
 
 ## Features
 
-✨ **Last Monday of Month**: Automatically triggers on the last Monday of each month (not a fixed date!)
-🎯 **Smart Scheduling**: Cron jobs run weekly, bot intelligently detects the right day
-✨ **Monthly Call Check-ins**: Asks group members if they have time for a call
-🤝 **Random Pairing**: Automatically pairs willing participants randomly
-📞 **Private Notifications**: Sends one person from each pair their assignment privately
-🤐 **Privacy**: If someone doesn't call, it remains their secret - others won't notice
-👥 **User Registration**: Simple /start registration to participate
-🚀 **Cloud Ready**: Deploy on Railway.app, stay within free tier
+**Last Monday of Month**: Automatically triggers on the last Monday of each month (not a fixed date!)
+**Smart Scheduling**: Cron jobs run weekly, bot intelligently detects the right day
+**Monthly Call Check-ins**: Asks group members if they have time for a call
+**Random Pairing**: Automatically pairs willing participants randomly
+**Private Notifications**: Sends one person from each pair their assignment privately
+**Privacy**: If someone doesn't call, it remains their secret - others won't notice
+**User Registration**: Simple /start registration to participate
+**Cloud Ready**: Deploy on Railway.app, stay within free tier
 
 ## Quick Start: Choose Your Deployment
 
-### 🚀 Deploy on Railway (Recommended - Free!)
+### Deploy on Railway (Recommended - Free!)
 
 For hands-off operation without running code on your computer:
 
@@ -38,7 +38,7 @@ For hands-off operation without running code on your computer:
 3. Uses free tier ($5/month credits, typical usage <$1/month)
 4. No need to keep your computer running
 
-### 💻 Run Locally (Development)
+### Run Locally (Development)
 
 For testing before deploying:
 

@@ -1,4 +1,4 @@
-# 🔐 Security Guide: Storing Secrets
+# Security Guide: Storing Secrets
 
 Your bot handles sensitive information:
 - `BOT_TOKEN` - Grants control over your bot
@@ -7,15 +7,15 @@ Your bot handles sensitive information:
 
 This guide explains secure ways to store these.
 
-## 🚀 Quick Answer
+## Quick Answer
 
-**Railway users:** Use Railway's built-in secret management (lock icon 🔒)
+**Railway users:** Use Railway's built-in secret management (lock icon)
 
 **Everyone:** Never commit secrets to Git. Use `.env` files locally.
 
 ---
 
-## Option 1: Railway's Secret Management ⭐ Recommended
+## Option 1: Railway's Secret Management - Recommended
 
 Best for production on Railway.
 
@@ -25,23 +25,23 @@ Best for production on Railway.
 2. **Variables Tab:** Click Variables
 3. **For each sensitive variable:**
    - Enter the value
-   - Click the **lock icon 🔒** next to it
+   - Click the **lock icon** next to it
    - Save
 
 ### What This Does
 
-✅ Encrypts at rest (secure storage)
-✅ Encrypts in transit (safe during deployment)
-✅ Hidden from logs (won't appear in output)
-✅ Restricted viewing (can limit team access)
-✅ Auto-injected into environment
+- Encrypts at rest (secure storage)
+- Encrypts in transit (safe during deployment)
+- Hidden from logs (won't appear in output)
+- Restricted viewing (can limit team access)
+- Auto-injected into environment
 
 ### Example Setup
 
 ```
-BOT_TOKEN     [•••••••••••] 🔒 <- Encrypted
-CRON_SECRET   [•••••••••••] 🔒 <- Encrypted
-GROUP_CHAT_ID [123456789]       <- Not sensitive, no lock needed
+BOT_TOKEN     [•••••••••••]  <- Encrypted
+CRON_SECRET   [•••••••••••]  <- Encrypted
+GROUP_CHAT_ID [123456789]    <- Not sensitive, no lock needed
 TIMEZONE      [Europe/Berlin]   <- Not sensitive
 ```
 
@@ -81,7 +81,7 @@ echo "CRON_SECRET=your-secure-secret" >> .env
 echo "GROUP_CHAT_ID=123456789" >> .env
 ```
 
-2. It's already in `.gitignore` ✅
+2. It's already in `.gitignore`
 ```bash
 cat .gitignore | grep "\.env"
 # Output: .env
@@ -206,18 +206,18 @@ BOT_TOKEN = secret['data']['data']['BOT_TOKEN']
 ```
 
 ### When to Use
-- 🏢 Enterprise/production
-- 👥 Large teams
-- 🔄 Multiple environments
-- 🔍 Audit logging needed
+- Enterprise/production
+- Large teams
+- Multiple environments
+- Audit logging needed
 
 For a hobby bot on Railway: **Don't use this.** Overkill.
 
 ---
 
-## 🎯 Recommendation by Scenario
+## Recommendation by Scenario
 
-### Scenario 1: Railway Deployment ⭐
+### Scenario 1: Railway Deployment
 ```
 Use: Railway Secrets + .env locally
 Process:
@@ -249,13 +249,13 @@ Process:
 
 ### Scenario 4: Hobby Project (Your Case)
 ```
-✅ DO:
+Do:
    ├─ Use Railway secrets (lock icon)
    ├─ Use .env locally (in .gitignore)
    ├─ Generate strong CRON_SECRET
    └─ Never commit .env to Git
 
-❌ DON'T:
+Don't:
    ├─ Put tokens in code
    ├─ Commit .env file
    ├─ Use same secret everywhere
@@ -264,10 +264,10 @@ Process:
 
 ---
 
-## 🔧 Checklist: Did You Secure Your Bot?
+## Checklist: Did You Secure Your Bot?
 
-- [ ] `BOT_TOKEN` marked as secret in Railway (lock icon 🔒)
-- [ ] `CRON_SECRET` marked as secret in Railway (lock icon 🔒)
+- [ ] `BOT_TOKEN` marked as secret in Railway (lock icon)
+- [ ] `CRON_SECRET` marked as secret in Railway (lock icon)
 - [ ] `.env` file in `.gitignore` (not committed to Git)
 - [ ] Never tested with real tokens in code examples
 - [ ] Different `CRON_SECRET` from default/example
@@ -277,7 +277,7 @@ Process:
 
 ---
 
-## 🚨 If You Accidentally Exposed Your Token
+## If You Accidentally Exposed Your Token
 
 ### Immediate Actions
 
@@ -349,13 +349,13 @@ git log --all --full-history -- ".env"
 
 | Method | Local | Railway | Difficulty | Cost |
 |--------|-------|---------|-----------|------|
-| `.env` + Railway Secrets | ✅ | ✅ | Easy | Free |
-| Git-Crypt | ✅ | ✅ | Medium | Free |
-| Docker Secrets | ✅ | ❌ | Medium | Free |
-| AWS Secrets Manager | ❌ | ✅ | Hard | $0.40/month |
-| Vault | ✅ | ✅ | Hard | Self-hosted |
+| `.env` + Railway Secrets | Yes | Yes | Easy | Free |
+| Git-Crypt | Yes | Yes | Medium | Free |
+| Docker Secrets | Yes | No | Medium | Free |
+| AWS Secrets Manager | No | Yes | Hard | $0.40/month |
+| Vault | Yes | Yes | Hard | Self-hosted |
 
-**👉 For you:** Use `.env` locally + Railway Secrets (lock icon). Done!
+**For you:** Use `.env` locally + Railway Secrets (lock icon). Done!
 
 ---
 

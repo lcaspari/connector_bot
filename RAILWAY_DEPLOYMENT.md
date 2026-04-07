@@ -128,7 +128,7 @@ GitHub Actions is built into GitHub and triggers directly from your repo. No ext
    - Go to "Actions" tab in your GitHub repository
    - See all scheduled and manual runs
    - Check logs for any failures
-   - Green ✅ = Successful, Red ❌ = Failed
+   - Green = Successful, Red = Failed
 
 5. **Manual trigger for testing:**
    - Actions tab → "Connector Bot Cron Jobs"
@@ -199,7 +199,7 @@ Examples:
 2. **Bot checks:** Is today the last Monday of the month?
    - Monday at start of month → Do nothing
    - Monday at middle of month → Do nothing
-   - Monday at end of month (no more Mondays this month) → Execute! ✅
+   - Monday at end of month (no more Mondays this month) → Execute!
 3. **Database tracking:** Records that job was executed in `cron_executions` table
    - Prevents running twice even if cron fires again
    - Resets monthly with new month_year
@@ -352,11 +352,11 @@ When ready for production:
 
 ## Important Security Notes
 
-⚠️ **Never commit these to Git:**
+**Never commit these to Git:**
 - `BOT_TOKEN` - Use Railway's environment variables
 - `.env` files - Add to `.gitignore`
 
-✅ **Always use strong `CRON_SECRET`:**
+**Always use strong `CRON_SECRET`:**
 - Change from default
 - Make it long and random: `python -c "import secrets; print(secrets.token_hex(32))"`
 - Store securely in Railway variables
