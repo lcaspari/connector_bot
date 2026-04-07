@@ -26,8 +26,8 @@ jobs:
     runs-on: ubuntu-latest
     needs: ask-for-calls
     steps:
-      - name: Wait 10 minutes before pairing
-        run: sleep 600
+      - name: Wait 1 hour before pairing
+        run: sleep 3600
       
       - name: Trigger /cron/pair endpoint
         run: |

@@ -288,7 +288,7 @@ async def register_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.answer()
     await query.edit_message_text(
         text=f"You're registered, {first_name}! "
-             "You'll get notifications when it's time for the monthly call check-in."
+             "You'll get notifications when it's time for a call."
     )
     
     logger.info(f"User {user_id} ({first_name}) registered.")
@@ -296,11 +296,11 @@ async def register_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Show help information."""
     await update.message.reply_text(
-        "Hey, these are so far the only latin words I understand:\n\n"
+        "Hey, these are so far the only words I understand:\n\n"
         "/start - register and I will put you on my mailing list\n"
         "/help - well ...\n"
         "/status - check if I have put you on my list\n\n"
-        "And this is what I can do:\n"
+        "And this is what I can do:\n\n"
         "1. I'll ask the group monthly if people have time for a call\n"
         "2. You respond with Yes or No\n"
         "3. If you say yes, you might get paired with someone\n"
@@ -366,7 +366,7 @@ async def send_ask_for_calls(bot):
         await bot.send_message(
             chat_id=GROUP_CHAT_ID,
             text="Hey everyone, Avaloki here! It is full moon again :)\n\n"
-                 "Do you have time for a call in about an hour? :)"
+                 "Do you have time for a call in about an hour? "
                  "Let me know below!\n\n"
                  "_Important: To receive your private pairing assignment, "
                  "start a chat with me by sending /start as a private message to me!_",
