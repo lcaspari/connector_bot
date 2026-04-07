@@ -365,7 +365,7 @@ async def send_ask_for_calls(bot):
     try:
         await bot.send_message(
             chat_id=GROUP_CHAT_ID,
-            text="Hey everyone, Avaloki here!\n\n"
+            text="Hey everyone, Avaloki here! It is full moon again :)\n\n"
                  "Do you have time for a call in about an hour? :)"
                  "Let me know below!\n\n"
                  "_Important: To receive your private pairing assignment, "
