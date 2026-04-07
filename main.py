@@ -112,16 +112,16 @@ def init_database():
         )
     """)
     
-    # Cron execution tracking table
-    c.execute("""
-        CREATE TABLE IF NOT EXISTS cron_executions (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            job_name TEXT NOT NULL,
-            month_year TEXT NOT NULL,
-            executed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            UNIQUE(job_name, month_year)
-        )
-    """)
+    # Cron execution tracking table (deprecated - full moon check is sufficient)
+    # c.execute("""
+    #     CREATE TABLE IF NOT EXISTS cron_executions (
+    #         id INTEGER PRIMARY KEY AUTOINCREMENT,
+    #         job_name TEXT NOT NULL,
+    #         month_year TEXT NOT NULL,
+    #         executed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    #         UNIQUE(job_name, month_year)
+    #     )
+    # """)
     
     conn.commit()
     conn.close()
@@ -220,32 +220,11 @@ def get_paired_users(month_year: str) -> List[Tuple[int, int]]:
     conn.close()
     return pairs
 
-def job_already_executed_this_month(job_name: str) -> bool:
-    """Check if a cron job was already executed this month."""
-    conn = sqlite3.connect(DATABASE)
-    c = conn.cursor()
-    
-    month_year = datetime.now(TIMEZONE).strftime("%Y-%m")
-    c.execute(
-        "SELECT id FROM cron_executions WHERE job_name = ? AND month_year = ?",
-        (job_name, month_year)
-    )
-    result = c.fetchone()
-    conn.close()
-    return result is not None
-
-def record_job_execution(job_name: str):
-    """Record that a cron job was executed this month."""
-    conn = sqlite3.connect(DATABASE)
-    c = conn.cursor()
-    
-    month_year = datetime.now(TIMEZONE).strftime("%Y-%m")
-    c.execute(
-        "INSERT OR IGNORE INTO cron_executions (job_name, month_year) VALUES (?, ?)",
-        (job_name, month_year)
-    )
-    conn.commit()
-    conn.close()
+def job_already_executed_today(job_name: str) -> bool:
+    """Check if a cron job was already executed today (deprecated - use full moon check instead)."""
+    # This function is deprecated and no longer used.
+    # The full moon check is sufficient to prevent duplicate executions.
+    return False
 
 # ==================== BOT EVENT HANDLERS ====================
 
@@ -341,13 +320,6 @@ async def send_ask_for_calls(bot):
             "message": "Not a full moon day. No action taken."
         }
     
-    # Check if already executed this month (skip if TEST_MODE enabled)
-    if not TEST_MODE and job_already_executed_this_month("ask_for_calls"):
-        return {
-            "status": "skipped",
-            "message": "ask_for_calls already executed this month."
-        }
-    
     if GROUP_CHAT_ID is None:
         logger.error("GROUP_CHAT_ID not set. Bot hasn't been added to group yet.")
         return {"status": "error", "message": "GROUP_CHAT_ID not set"}
@@ -373,7 +345,6 @@ async def send_ask_for_calls(bot):
             reply_markup=reply_markup,
             parse_mode="Markdown"
         )
-        record_job_execution("ask_for_calls")
         logger.info(f"Asked group for monthly call participation ({month_year})")
         return {"status": "success", "message": f"Message sent to group {GROUP_CHAT_ID}"}
     except Exception as e:
@@ -397,13 +368,6 @@ async def send_pair_and_notify(bot):
         return {
             "status": "skipped",
             "message": "Not a full moon day. No action taken."
-        }
-    
-    # Check if already executed this month (skip if TEST_MODE enabled)
-    if not TEST_MODE and job_already_executed_this_month("pair_and_notify"):
-        return {
-            "status": "skipped",
-            "message": "pair_and_notify already executed this month."
         }
     
     month_year = datetime.now(TIMEZONE).strftime("%Y-%m")
@@ -485,8 +449,6 @@ async def send_pair_and_notify(bot):
             )
         except Exception as e:
             logger.error(f"Failed to send group message: {e}")
-    
-    record_job_execution("pair_and_notify")
     
     return {
         "status": "success",
