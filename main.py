@@ -6,8 +6,8 @@ Deployed on Railway.app with GitHub Actions cron jobs
 Architecture:
 - Flask Web Server: Runs 24/7 to handle HTTP requests and user interactions
 - GitHub Actions Cron Jobs (Every Monday):
-  * 19:00 UTC: ask_for_calls - Asks group if they have time
-  * 19:10 UTC: pair_and_notify - Creates pairs and notifies callers
+  * 18:00 Europe/Berlin: ask_for_calls - Asks group if they have time
+  * 19:00 Europe/Berlin: pair_and_notify - Creates pairs and notifies callers (1 hour later)
 - User Registration: On-demand via /start command (anytime)
 - Database: SQLite for storing users, responses, and job execution history
 """
@@ -35,7 +35,7 @@ BOT_TOKEN = os.getenv("BOT_TOKEN", "YOUR_BOT_TOKEN_HERE")
 GROUP_CHAT_ID = int(os.getenv("GROUP_CHAT_ID", "0")) if os.getenv("GROUP_CHAT_ID") else None
 
 CALL_DAY = int(os.getenv("CALL_DAY", "1"))
-CALL_HOUR = int(os.getenv("CALL_HOUR", "19"))
+CALL_HOUR = int(os.getenv("CALL_HOUR", "18"))
 CALL_MINUTE = int(os.getenv("CALL_MINUTE", "0"))
 
 TIMEZONE = pytz.timezone(os.getenv("TIMEZONE", "Europe/Berlin"))
@@ -259,12 +259,12 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         await update.message.reply_text(
-            f"Hi {first_name}! 👋\n\n"
-            "I'm the Monthly Call Connector Bot. Here's what I do:\n\n"
-            "1️⃣ Each month on a set date, I ask if you have time for a quick call\n"
-            "2️⃣ I randomly pair people who say 'yes'\n"
-            "3️⃣ I tell one person from each pair to call the other\n\n"
-            "No one will notice if you don't call - it's between you and me! 🤫\n\n"
+            f"Hey {first_name}!\n\n"
+            "I'm Avaloki. Here's what I do:\n\n"
+            "1. Each month on a set date, I ask if you have time for a quick call\n"
+            "2. I randomly pair people who say 'yes'\n"
+            "3. I tell one person from each pair to call the other\n\n"
+            "No one will notice if you don't call - it's between you and me :)\n\n"
             "Want to join?",
             reply_markup=reply_markup
         )
@@ -279,7 +279,7 @@ async def register_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     await query.answer()
     await query.edit_message_text(
-        text=f"✅ You're registered, {first_name}! "
+        text=f"You're registered, {first_name}! "
              "You'll get notifications when it's time for the monthly call check-in."
     )
     
@@ -308,10 +308,10 @@ async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     is_registered = is_user_registered(user_id)
     
     if is_registered:
-        await update.message.reply_text("✅ You are registered with the Call Bot!")
+        await update.message.reply_text("You are registered with the Call Bot!")
     else:
         await update.message.reply_text(
-            "❌ You are not registered. Use /start to register."
+            "You are not registered. Use /start to register."
         )
 
 async def ask_for_calls(context: ContextTypes.DEFAULT_TYPE):
@@ -337,9 +337,9 @@ async def ask_for_calls(context: ContextTypes.DEFAULT_TYPE):
     
     await context.bot.send_message(
         chat_id=GROUP_CHAT_ID,
-        text="🎤 *Monthly Call Check-in!* 🎤\n\n"
-             "Hey everyone! Do you have time for a call in about 10 minutes? "
-             "Let me know below! ⬇️",
+        text="Hey everyone, Avaloki here!\n\n"
+             "Do you have time for a call in about 10 minutes? :)"
+             "Let me know!",
         reply_markup=reply_markup,
         parse_mode="Markdown"
     )
@@ -382,8 +382,8 @@ async def send_ask_for_calls(bot):
     
     keyboard = [
         [
-            InlineKeyboardButton("✅ Yes, I have time!", callback_data=f"response_yes_{month_year}"),
-            InlineKeyboardButton("❌ No, busy", callback_data=f"response_no_{month_year}")
+            InlineKeyboardButton("Yes, I have time", callback_data=f"response_yes_{month_year}"),
+            InlineKeyboardButton("No, busy", callback_data=f"response_no_{month_year}")
         ]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
@@ -391,10 +391,10 @@ async def send_ask_for_calls(bot):
     try:
         await bot.send_message(
             chat_id=GROUP_CHAT_ID,
-            text="🎤 *Monthly Call Check-in!* 🎤\n\n"
-                 "Hey everyone! Do you have time for a call in about 10 minutes? "
-                 "Let me know below! ⬇️\n\n"
-                 "_⚠️ Important: To receive your private pairing assignment, "
+            text="Hey everyone, Avaloki here!\n\n"
+                 "Do you have time for a call in about an hour? :)"
+                 "Let me know below!\n\n"
+                 "_Important: To receive your private pairing assignment, "
                  "start a chat with me by sending /start in private messages!_",
             reply_markup=reply_markup,
             parse_mode="Markdown"
@@ -437,7 +437,7 @@ async def send_pair_and_notify(bot):
     yes_users = get_yes_responses(month_year)
     
     if len(yes_users) < 2:
-        msg = "Not enough people said yes for calls this month. See you next month! 👋"
+        msg = "Not enough people said yes for calls this month. See you next month!"
         if GROUP_CHAT_ID:
             try:
                 await bot.send_message(chat_id=GROUP_CHAT_ID, text=msg)
@@ -473,11 +473,11 @@ async def send_pair_and_notify(bot):
             
             await bot.send_message(
                 chat_id=caller_id,
-                text=f"📞 *Your Monthly Call Assignment* 📞\n\n"
-                     f"Please call {receiver_name} now or within the next 10 minutes!\n\n"
-                     f"They're expecting your call. If you can't make it right now, "
-                     f"it's okay - they won't know it was you who was supposed to call. 🤐",
-                parse_mode="Markdown"
+                text=f"Hello!\n\n"
+                     f"Please call <a href=\"tg://user?id={receiver_id}\">{receiver_name}</a> now :)\n\n"
+                     f"They're expecting a call, but if you can't make it right now, "
+                     f"it's completely fine :) they won't know it was you who was supposed to call.",
+                parse_mode="HTML"
             )
             notification_count += 1
             logger.info(f"Notified user {caller_id} to call {receiver_id}")
@@ -489,8 +489,8 @@ async def send_pair_and_notify(bot):
     if GROUP_CHAT_ID:
         paired_count = len(pairs)
         unpaired_text = ""
-        if len(yes_users) % 2 == 1:
-            unpaired_text = f"\n(One person got a surprise day off this month! 🎁)"
+        #if len(yes_users) % 2 == 1:
+        #    unpaired_text = f"\n(One person got a surprise day off this month! 🎁)"
         
         failed_text = ""
         if failed_users:
@@ -501,10 +501,11 @@ async def send_pair_and_notify(bot):
         try:
             await bot.send_message(
                 chat_id=GROUP_CHAT_ID,
-                text=f"✅ *Pairs created!* ✅\n\n"
+                text=f"*Pairs created!*\n\n"
                      f"{paired_count} pair{'s' if paired_count != 1 else ''} have been assigned. "
                      f"Those selected to call have received their assignments privately. "
-                     f"Good luck! 🍀{unpaired_text}{failed_text}",
+                     f"Please be reminded that maybe not everyone was assigned, so one person might not get a call."
+                     f"Good luck! {failed_text}",
                 parse_mode="Markdown"
             )
         except Exception as e:
@@ -526,7 +527,7 @@ async def handle_response_callback(update: Update, context: ContextTypes.DEFAULT
     
     # Check if registered
     if not is_user_registered(user_id):
-        await query.answer("❌ You must register first. Use /start in private chat.", show_alert=True)
+        await query.answer("You must register first. Use /start in private chat.", show_alert=True)
         return
     
     # Extract response and month_year from callback data
@@ -544,7 +545,7 @@ async def handle_response_callback(update: Update, context: ContextTypes.DEFAULT
 async def pair_and_notify(context: ContextTypes.DEFAULT_TYPE):
     """
     Run after response period ends to pair users and send notifications.
-    Should be scheduled ~10 minutes after ask_for_calls.
+    Should be scheduled ~1 hour after ask_for_calls.
     """
     month_year = datetime.now(TIMEZONE).strftime("%Y-%m")
     
@@ -552,7 +553,7 @@ async def pair_and_notify(context: ContextTypes.DEFAULT_TYPE):
     
     if len(yes_users) < 2:
         if GROUP_CHAT_ID:
-            message = "Not enough people said yes for calls this month. See you next month! 👋"
+            message = "Not enough people said yes for calls this month. See you next month! \n\nAvaloki"
             await context.bot.send_message(chat_id=GROUP_CHAT_ID, text=message)
         logger.info(f"Not enough yes responses for {month_year} (only {len(yes_users)})")
         return
@@ -584,11 +585,13 @@ async def pair_and_notify(context: ContextTypes.DEFAULT_TYPE):
             
             await context.bot.send_message(
                 chat_id=caller_id,
-                text=f"📞 *Your Monthly Call Assignment* 📞\n\n"
-                     f"Please call {receiver_name} now or within the next 10 minutes!\n\n"
+                text=f"Hello, \n\n"
+                     f"Please call <a href=\"tg://user?id={receiver_id}\">{receiver_name}</a> now or within the next hour!\n\n"
                      f"They're expecting your call. If you can't make it right now, "
-                     f"it's okay - they won't know it was you who was supposed to call. 🤐",
-                parse_mode="Markdown"
+                     f"it's completely fine :) they won't know it was you who was supposed to call."
+                     f"Please be reminded that maybe not everyone was assigned, so one person might not get a call."
+                     f"Good luck! ",
+                parse_mode="HTML"
             )
             logger.info(f"Notified user {caller_id} to call {receiver_id}")
         except Exception as e:
@@ -598,15 +601,15 @@ async def pair_and_notify(context: ContextTypes.DEFAULT_TYPE):
     if GROUP_CHAT_ID:
         paired_count = len(pairs)
         unpaired_text = ""
-        if len(yes_users) % 2 == 1:
-            unpaired_text = f"\n(One person got a surprise day off this month! 🎁)"
+        #if len(yes_users) % 2 == 1:
+        #    unpaired_text = f"\n(One person got a surprise day off this month!)"
         
         await context.bot.send_message(
             chat_id=GROUP_CHAT_ID,
-            text=f"✅ *Pairs created!* ✅\n\n"
+            text=f"*Pairs created!*\n\n"
                  f"{paired_count} pair{'s' if paired_count != 1 else ''} have been assigned. "
                  f"Those who were selected to call have received their assignments privately. "
-                 f"Good luck! 🍀{unpaired_text}",
+                 f"Good luck!",
             parse_mode="Markdown"
         )
 
@@ -625,10 +628,11 @@ async def handle_new_group_member(update: Update, context: ContextTypes.DEFAULT_
             if member.is_bot and member.username == (await context.bot.get_me()).username:
                 GROUP_CHAT_ID = update.message.chat_id
                 await update.message.reply_text(
-                    "Hi! I'm Avalokiteshvara, but lowkey - people just call me Avaloki, the Call Connector Bot.\n\n"
+                    "Hi! I'm Avalokiteshvara \n\n"
+                    "but lowkey - people just call me Avaloki, the call connector Bot ;)\n\n"
                     "I'll ask you once a month if you have time for a call, "
                     "and I'll randomly pair you with someone else to chat. "
-                    "but no pressure - if you don't call, it stays between us, hihi :)\n\n"
+                    "but no pressure - if you don't call, it stays between us hihi :)\n\n"
                     "Use /start in private chat to register with me."
                 )
                 logger.info(f"Bot added to group {GROUP_CHAT_ID}")
@@ -704,7 +708,7 @@ async def process_telegram_update(update_data: dict, app=None) -> bool:
                 await status_command(update, context)
             else:
                 # Unknown command
-                await update.message.reply_text("Unknown command. Type /help for available commands.")
+                await update.message.reply_text("Hey sorry, usually people from a far different cultural region commmunicate with me, so my knowledge of latin languages is still limited. Type /help for available vocabulary.")
         
         # Handle button callbacks (query updates)
         elif update.callback_query:
