@@ -20,14 +20,7 @@ from datetime import datetime, timedelta
 from typing import Optional, List, Tuple
 import pytz
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import (
-    Application,
-    CommandHandler,
-    MessageHandler,
-    CallbackQueryHandler,
-    ContextTypes,
-    filters,
-)
+from telegram.ext import ContextTypes
 
 # ==================== CONFIGURATION ====================
 
@@ -314,38 +307,6 @@ async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "You are not registered. Use /start to register."
         )
 
-async def ask_for_calls(context: ContextTypes.DEFAULT_TYPE):
-    """
-    Monthly scheduled task: Ask group if anyone wants to have calls.
-    Gets called on CALL_DAY at CALL_HOUR:CALL_MINUTE
-    """
-    global GROUP_CHAT_ID
-    
-    if GROUP_CHAT_ID is None:
-        logger.error("GROUP_CHAT_ID not set. Bot hasn't been added to group yet.")
-        return
-    
-    month_year = datetime.now(TIMEZONE).strftime("%Y-%m")
-    
-    keyboard = [
-        [
-            InlineKeyboardButton("✅ Yes, I have time!", callback_data=f"response_yes_{month_year}"),
-            InlineKeyboardButton("❌ No, busy", callback_data=f"response_no_{month_year}")
-        ]
-    ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
-    
-    await context.bot.send_message(
-        chat_id=GROUP_CHAT_ID,
-        text="Hey everyone, Avaloki here!\n\n"
-             "Do you have time for a call in about 10 minutes? :)"
-             "Let me know!",
-        reply_markup=reply_markup,
-        parse_mode="Markdown"
-    )
-    
-    logger.info(f"Asked group for monthly call participation ({month_year})")
-
 # ==================== CRON JOB FUNCTIONS ====================
 
 async def send_ask_for_calls(bot):
@@ -542,83 +503,6 @@ async def handle_response_callback(update: Update, context: ContextTypes.DEFAULT
     
     logger.info(f"User {user_id} ({first_name}) responded '{response}' for {month_year}")
 
-async def pair_and_notify(context: ContextTypes.DEFAULT_TYPE):
-    """
-    Run after response period ends to pair users and send notifications.
-    Should be scheduled ~1 hour after ask_for_calls.
-    """
-    month_year = datetime.now(TIMEZONE).strftime("%Y-%m")
-    
-    yes_users = get_yes_responses(month_year)
-    
-    if len(yes_users) < 2:
-        if GROUP_CHAT_ID:
-            message = "Not enough people said yes for calls this month. See you next month! \n\nAvaloki"
-            await context.bot.send_message(chat_id=GROUP_CHAT_ID, text=message)
-        logger.info(f"Not enough yes responses for {month_year} (only {len(yes_users)})")
-        return
-    
-    # Randomly shuffle and pair
-    random.shuffle(yes_users)
-    pairs: List[Tuple[int, int]] = []
-    
-    # If odd number, last person won't be paired (and won't know why)
-    for i in range(0, len(yes_users) - 1, 2):
-        caller_id = yes_users[i]
-        receiver_id = yes_users[i + 1]
-        pairs.append((caller_id, receiver_id))
-    
-    # Save pairs to database
-    save_pairs(month_year, pairs)
-    
-    # Send notifications
-    for caller_id, receiver_id in pairs:
-        try:
-            # Get receiver's name
-            conn = sqlite3.connect(DATABASE)
-            c = conn.cursor()
-            c.execute("SELECT first_name FROM users WHERE user_id = ?", (receiver_id,))
-            receiver_data = c.fetchone()
-            conn.close()
-            
-            receiver_name = receiver_data[0] if receiver_data else f"User {receiver_id}"
-            
-            await context.bot.send_message(
-                chat_id=caller_id,
-                text=f"Hello, \n\n"
-                     f"Please call <a href=\"tg://user?id={receiver_id}\">{receiver_name}</a> now or within the next hour!\n\n"
-                     f"They're expecting your call. If you can't make it right now, "
-                     f"it's completely fine :) they won't know it was you who was supposed to call."
-                     f"Please be reminded that maybe not everyone was assigned, so one person might not get a call."
-                     f"Good luck! ",
-                parse_mode="HTML"
-            )
-            logger.info(f"Notified user {caller_id} to call {receiver_id}")
-        except Exception as e:
-            logger.error(f"Failed to notify user {caller_id}: {e}")
-    
-    # Notify group
-    if GROUP_CHAT_ID:
-        paired_count = len(pairs)
-        unpaired_text = ""
-        #if len(yes_users) % 2 == 1:
-        #    unpaired_text = f"\n(One person got a surprise day off this month!)"
-        
-        await context.bot.send_message(
-            chat_id=GROUP_CHAT_ID,
-            text=f"*Pairs created!*\n\n"
-                 f"{paired_count} pair{'s' if paired_count != 1 else ''} have been assigned. "
-                 f"Those who were selected to call have received their assignments privately. "
-                 f"Good luck!",
-            parse_mode="Markdown"
-        )
-
-async def post_init(application: Application):
-    """Set up scheduler after bot starts."""
-    # NOTE: For Railway cron jobs, the scheduler is NOT set up here
-    # Instead, use Railway's cron job feature to call the functions directly
-    logger.info("Bot initialized (scheduler disabled for Railway cron jobs)")
-
 async def handle_new_group_member(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handle when bot joins a group."""
     global GROUP_CHAT_ID
@@ -636,29 +520,6 @@ async def handle_new_group_member(update: Update, context: ContextTypes.DEFAULT_
                     "Use /start in private chat to register with me."
                 )
                 logger.info(f"Bot added to group {GROUP_CHAT_ID}")
-
-def build_app_sync() -> Application:
-    """
-    Build and configure the Telegram bot application (synchronous version).
-    Called at module import time to ensure it runs in the main thread.
-    Does NOT start the scheduler - that's handled separately by cron jobs.
-    """
-    init_database()
-    
-    app = Application.builder().token(BOT_TOKEN).build()
-    
-    # Handlers for private chat (registration)
-    app.add_handler(CommandHandler("start", start))
-    app.add_handler(CommandHandler("help", help_command))
-    app.add_handler(CommandHandler("status", status_command))
-    
-    app.add_handler(CallbackQueryHandler(register_callback, pattern="^register_yes$"))
-    app.add_handler(CallbackQueryHandler(handle_response_callback, pattern="^response_"))
-    
-    # Handler for bot joining group
-    app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, handle_new_group_member))
-    
-    return app
 
 async def process_telegram_update(update_data: dict, app=None) -> bool:
     """
@@ -733,6 +594,4 @@ async def process_telegram_update(update_data: dict, app=None) -> bool:
         logger.error(f"Failed to process update: {type(e).__name__}: {e}", exc_info=True)
         return False
 
-if __name__ == "__main__":
-    import asyncio
-    asyncio.run(run_polling_session())
+
