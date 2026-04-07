@@ -396,7 +396,7 @@ async def send_pair_and_notify(bot):
     yes_users = get_yes_responses(month_year)
     
     if len(yes_users) < 2:
-        msg = "Hey, not enough people said yes for calls this month. That's fine, it means you are having a nice time (hopefully!) :). \nSee you next month! Avaloki"
+        msg = "Hey, not enough people said yes for calls this month. That's fine, it means you are having a nice time on earth :). \nSee you next moon! Avaloki"
         if GROUP_CHAT_ID:
             try:
                 await bot.send_message(chat_id=GROUP_CHAT_ID, text=msg)
@@ -515,9 +515,9 @@ async def handle_new_group_member(update: Update, context: ContextTypes.DEFAULT_
                     "but lowkey - people just call me Avaloki, the call connector bot ;)\n\n"
                     "I'll ask you once a month if you have time for a call, "
                     "and I'll randomly pair you with someone else. "
-                    "but no pressure - if you don't call, it stays between us hihi\n\n"
-                    "Please write /start in my private chat to register with me. :)\n\n"
-                    "Happy to be here! \n- Avaloki"
+                    "but no pressure - if you don't call, it stays between us.\n\n"
+                    "Please write /start in private chat to register with me. :)\n\n"
+                    "Happy to be incarnated here! \nAvaloki"
                 )
                 logger.info(f"Bot added to group {GROUP_CHAT_ID}")
 
